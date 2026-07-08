@@ -1,0 +1,10 @@
+{
+    "name": "rasha/clinic-api",
+    "description": "Rasha Clinic Booking System",
+    "type": "project",
+    "require": {
+        "php": ">=8.0",
+        "firebase/php-jwt": "^5.0",
+        "vlucas/phpdotenv": "^5.5"
+    }
+}

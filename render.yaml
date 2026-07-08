@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: rasha
+    runtime: php
+    buildCommand: composer install --ignore-platform-reqs
+    startCommand: php -S 0.0.0.0:10000 -t .
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false

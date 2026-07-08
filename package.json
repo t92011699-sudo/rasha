@@ -1,8 +1,0 @@
- {
-  "name": "rasha-clinic",
-  "version": "1.0.0",
-  "description": "Rasha Clinic Booking System",
-  "scripts": {
-    "vercel-build": "composer install --ignore-platform-reqs"
-  }
-}

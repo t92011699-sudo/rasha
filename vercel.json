@@ -1,54 +1,9 @@
  {
   "version": 2,
-  "functions": {
-    "api/*.php": {
-      "runtime": "vercel-php@0.9.0"
-    }
-  },
   "routes": [
     {
-      "src": "/api/admin/login",
-      "dest": "/api/admin/login.php"
-    },
-    {
-      "src": "/api/admin/departments",
-      "dest": "/api/admin/departments.php"
-    },
-    {
-      "src": "/api/admin/doctor-types",
-      "dest": "/api/admin/doctor-types.php"
-    },
-    {
-      "src": "/api/admin/slots",
-      "dest": "/api/admin/slots.php"
-    },
-    {
-      "src": "/api/admin/slots/(.*)",
-      "dest": "/api/admin/slots.php?id=$1"
-    },
-    {
-      "src": "/api/admin/bookings",
-      "dest": "/api/admin/bookings.php"
-    },
-    {
-      "src": "/api/admin/bookings/(.*)",
-      "dest": "/api/admin/bookings.php?id=$1"
-    },
-    {
-      "src": "/api/departments",
-      "dest": "/api/departments.php"
-    },
-    {
-      "src": "/api/departments/(.*)",
-      "dest": "/api/departments.php?id=$1"
-    },
-    {
-      "src": "/api/slots",
-      "dest": "/api/slots.php"
-    },
-    {
-      "src": "/api/bookings",
-      "dest": "/api/bookings.php"
+      "src": "/api/(.*)",
+      "dest": "/api/$1.php"
     },
     {
       "src": "/(.*)",

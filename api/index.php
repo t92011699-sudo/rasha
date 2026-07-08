@@ -1,33 +1,40 @@
  <?php
-// index.php
+// api/index.php
 
-header('Content-Type: application/json');
+// تحميل autoloader
+require_once __DIR__ . '/../vendor/autoload.php';
 
-echo json_encode([
-    'message' => '🚀 Rasha Clinic API is running!',
-    'version' => '1.0.0',
-    'supabase_connected' => true,
-    'endpoints' => [
-        'auth' => ['POST /api/admin/login'],
-        'patient' => [
+// تحميل .env
+use Dotenv\Dotenv;
+$dotenv = Dotenv::createImmutable(__DIR__ . '/..');
+$dotenv->load();
+
+// الحصول على المسار المطلوب
+$path = $_SERVER['REQUEST_URI'] ?? '/';
+
+// توجيه الطلبات
+if ($path === '/' || $path === '') {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'message' => '🚀 Rasha Clinic API',
+        'version' => '1.0.0',
+        'endpoints' => [
+            'POST /api/admin/login',
             'GET /api/departments',
-            'GET /api/departments/{id}',
-            'GET /api/slots?doctor_type_id=&date=',
+            'GET /api/slots',
             'POST /api/bookings'
-        ],
-        'admin' => [
-            'GET /api/admin/slots',
-            'POST /api/admin/slots',
-            'PUT /api/admin/slots/{id}',
-            'DELETE /api/admin/slots/{id}',
-            'GET /api/admin/bookings',
-            'DELETE /api/admin/bookings/{id}',
-            'GET /api/admin/departments',
-            'POST /api/admin/departments',
-            'PUT /api/admin/departments/{id}',
-            'DELETE /api/admin/departments/{id}',
-            'POST /api/admin/doctor-types'
         ]
-    ]
-]);
-?>
+    ]);
+    exit;
+}
+
+// محاولة تحميل الملف المطلوب
+$file = __DIR__ . $path . '.php';
+if (file_exists($file)) {
+    require $file;
+    exit;
+}
+
+// 404
+http_response_code(404);
+echo json_encode(['error' => 'Not found']);

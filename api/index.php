@@ -1,10 +1,10 @@
 <?php
 /**
- * Clinic API - Vercel Serverless
+ * Clinic API - Vercel Serverless with Supabase
  * Version: 3.2.0
  */
 
-// تعيين المسارات الصحيحة لبيئة Vercel
+// تعيين المسارات الصحيحة
 $root = dirname(__DIR__);
 
 require_once $root . '/config/database.php';
@@ -118,7 +118,6 @@ route($routes, 'POST', '#^/api/admin/login$#', function () {
         
         $admin = $admins[0];
         
-        // في الإنتاج استخدم password_hash و password_verify
         if ($password !== $admin['password']) {
             jsonError('بيانات الدخول غير صحيحة', 401);
         }
@@ -149,7 +148,7 @@ route($routes, 'POST', '#^/api/admin/login$#', function () {
 });
 
 // ============================
-// 2. Departments - GET
+// 2. Departments
 // ============================
 
 route($routes, 'GET', '#^/api/departments$#', function () {
@@ -334,9 +333,130 @@ route($routes, 'DELETE', '#^/api/departments/([^/]+)$#', function (array $p) {
     }
 });
 
+route($routes, 'PUT', '#^/api/departments/reorder$#', function () {
+    requireAuth();
+    
+    $body = getJsonBody();
+    $orderedIds = $body['ordered_ids'] ?? null;
+
+    if (!is_array($orderedIds)) {
+        jsonError('ordered_ids مطلوب كمصفوفة', 400);
+    }
+
+    try {
+        foreach ($orderedIds as $index => $id) {
+            supabasePatch('departments', [
+                'order' => $index + 1,
+                'updated_at' => nowIso(),
+            ], ['id' => 'eq.' . $id], true);
+        }
+        jsonResponse(['message' => 'تم إعادة ترتيب الأقسام بنجاح']);
+    } catch (Exception $e) {
+        error_log('❌ Error reordering: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء إعادة الترتيب', 500);
+    }
+});
+
+route($routes, 'PUT', '#^/api/departments/([^/]+)/doctor-types$#', function (array $p) {
+    requireAuth();
+    
+    $id = $p[1];
+    $body = getJsonBody();
+    $doctorTypes = $body['doctor_types'] ?? null;
+
+    if (!is_array($doctorTypes)) {
+        jsonError('doctor_types مطلوب كمصفوفة', 400);
+    }
+
+    try {
+        foreach ($doctorTypes as $type) {
+            $label = $type['label'] ?? (($type['type'] ?? '') === 'male' ? 'دكتور' : 'دكتورة');
+            $enabled = $type['enabled'] ?? true;
+
+            $existing = supabaseGet('doctor_types', [
+                'department_id' => 'eq.' . $id,
+                'type' => 'eq.' . ($type['type'] ?? ''),
+                'limit' => 1,
+            ]);
+
+            if (empty($existing)) {
+                supabasePost('doctor_types', [
+                    'department_id' => $id,
+                    'type' => $type['type'] ?? null,
+                    'label' => $label,
+                    'enabled' => $enabled ? 1 : 0,
+                    'created_at' => nowIso(),
+                    'updated_at' => nowIso(),
+                ], true);
+            } else {
+                supabasePatch('doctor_types', [
+                    'label' => $label,
+                    'enabled' => $enabled ? 1 : 0,
+                    'updated_at' => nowIso(),
+                ], ['id' => 'eq.' . $existing[0]['id']], true);
+            }
+        }
+
+        $doctorTypesRows = supabaseGet('doctor_types', [
+            'department_id' => 'eq.' . $id,
+        ]);
+        
+        foreach ($doctorTypesRows as &$dtRow) {
+            $dtRow['enabled'] = (bool) $dtRow['enabled'];
+        }
+        unset($dtRow);
+
+        jsonResponse([
+            'department_id' => $id,
+            'doctor_types' => $doctorTypesRows,
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Error updating doctor types: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء تحديث أنواع الأطباء', 500);
+    }
+});
+
 // ============================
 // 4. Custom Slots
 // ============================
+
+route($routes, 'GET', '#^/api/departments/([^/]+)/doctor-types/([^/]+)/custom-slots$#', function (array $p) {
+    $departmentId = $p[1];
+    $type = $p[2];
+    $date = $_GET['date'] ?? null;
+
+    if (!$date) {
+        jsonError('التاريخ مطلوب', 400);
+    }
+
+    try {
+        $doctorTypes = supabaseGet('doctor_types', [
+            'department_id' => 'eq.' . $departmentId,
+            'type' => 'eq.' . $type,
+            'limit' => 1,
+        ]);
+        
+        if (empty($doctorTypes)) {
+            jsonError('نوع الطبيب غير موجود', 404);
+        }
+        
+        $doctorType = $doctorTypes[0];
+        $slots = supabaseGet('custom_slots', [
+            'doctor_type_id' => 'eq.' . $doctorType['id'],
+            'date' => 'eq.' . $date,
+            'order' => 'from_time.asc',
+        ]);
+
+        jsonResponse([
+            'doctor_type' => $type,
+            'date' => $date,
+            'custom_slots' => array_map('formatSlotSupabase', $slots),
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Error fetching custom slots: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء جلب المواعيد المخصصة', 500);
+    }
+});
 
 route($routes, 'GET', '#^/api/departments/([^/]+)/doctor-types/([^/]+)/slots$#', function (array $p) {
     $departmentId = $p[1];
@@ -422,6 +542,119 @@ route($routes, 'POST', '#^/api/departments/([^/]+)/doctor-types/([^/]+)/custom-s
     }
 });
 
+route($routes, 'PUT', '#^/api/departments/([^/]+)/doctor-types/([^/]+)/custom-slots/([^/]+)$#', function (array $p) {
+    requireAuth();
+    
+    $slotId = $p[3];
+    $body = getJsonBody();
+
+    $data = ['updated_at' => nowIso()];
+    if (array_key_exists('capacity', $body)) {
+        $data['capacity'] = $body['capacity'];
+    }
+    if (!empty($body['from_time'])) {
+        $data['from_time'] = $body['from_time'];
+    }
+    if (!empty($body['to_time'])) {
+        $data['to_time'] = $body['to_time'];
+    }
+
+    try {
+        supabasePatch('custom_slots', $data, ['id' => 'eq.' . $slotId], true);
+        
+        $slots = supabaseGet('custom_slots', [
+            'id' => 'eq.' . $slotId,
+            'limit' => 1,
+        ]);
+        
+        if (empty($slots)) {
+            jsonError('الفترة غير موجودة', 404);
+        }
+        
+        $slot = $slots[0];
+        $currentBookings = countBookingsForSlotSupabase($slot['id']);
+
+        jsonResponse([
+            'message' => 'تم تحديث الفترة بنجاح',
+            'slot' => [
+                'id' => $slot['id'],
+                'date' => $slot['date'],
+                'from_time' => $slot['from_time'],
+                'to_time' => $slot['to_time'],
+                'capacity' => $slot['capacity'],
+                'current_bookings' => $currentBookings,
+                'remaining' => $slot['capacity'] - $currentBookings,
+                'available' => $currentBookings < $slot['capacity'],
+            ],
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Error updating slot: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء تحديث الموعد', 500);
+    }
+});
+
+route($routes, 'PATCH', '#^/api/departments/([^/]+)/doctor-types/([^/]+)/custom-slots/([^/]+)/capacity$#', function (array $p) {
+    requireAuth();
+    
+    $slotId = $p[3];
+    $body = getJsonBody();
+    $capacity = $body['capacity'] ?? null;
+
+    if ($capacity === null || $capacity < 0) {
+        jsonError('السعة مطلوبة ويجب أن تكون أكبر من أو تساوي 0', 400);
+    }
+
+    try {
+        $slots = supabaseGet('custom_slots', [
+            'id' => 'eq.' . $slotId,
+            'limit' => 1,
+        ]);
+        
+        if (empty($slots)) {
+            jsonError('الفترة غير موجودة', 404);
+        }
+        
+        $currentSlot = $slots[0];
+        $currentBookings = countBookingsForSlotSupabase($slotId);
+
+        if ($capacity < $currentBookings) {
+            jsonResponse([
+                'error' => "لا يمكن تقليل السعة إلى أقل من عدد الحجوزات الحالية ($currentBookings)",
+                'current_bookings' => $currentBookings,
+                'requested_capacity' => $capacity,
+            ], 400);
+        }
+
+        supabasePatch('custom_slots', [
+            'capacity' => $capacity,
+            'updated_at' => nowIso(),
+        ], ['id' => 'eq.' . $slotId], true);
+        
+        $updatedSlots = supabaseGet('custom_slots', [
+            'id' => 'eq.' . $slotId,
+            'limit' => 1,
+        ]);
+        $slot = $updatedSlots[0];
+
+        jsonResponse([
+            'message' => 'تم تحديث السعة بنجاح',
+            'slot' => [
+                'id' => $slot['id'],
+                'date' => $slot['date'],
+                'from_time' => $slot['from_time'],
+                'to_time' => $slot['to_time'],
+                'capacity' => $slot['capacity'],
+                'current_bookings' => $currentBookings,
+                'remaining' => $slot['capacity'] - $currentBookings,
+                'available' => $currentBookings < $slot['capacity'],
+            ],
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Error updating capacity: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء تحديث السعة', 500);
+    }
+});
+
 route($routes, 'DELETE', '#^/api/departments/([^/]+)/doctor-types/([^/]+)/custom-slots/([^/]+)$#', function (array $p) {
     requireAuth();
     
@@ -437,7 +670,125 @@ route($routes, 'DELETE', '#^/api/departments/([^/]+)/doctor-types/([^/]+)/custom
 });
 
 // ============================
-// 5. Bookings
+// 5. Save changes (Update Department with all related data)
+// ============================
+
+route($routes, 'PUT', '#^/api/departments/([^/]+)/save$#', function (array $p) {
+    requireAuth();
+    
+    $id = $p[1];
+    $body = getJsonBody();
+
+    $name = $body['name'] ?? null;
+    $iconUrl = array_key_exists('icon_url', $body) ? $body['icon_url'] : null;
+    $doctorTypes = $body['doctor_types'] ?? null;
+
+    try {
+        // تحديث القسم
+        $deptData = ['updated_at' => nowIso()];
+        if ($name) {
+            $deptData['name'] = $name;
+        }
+        if (array_key_exists('icon_url', $body)) {
+            $deptData['icon_url'] = $iconUrl;
+        }
+        supabasePatch('departments', $deptData, ['id' => 'eq.' . $id], true);
+
+        // تحديث أنواع الأطباء
+        if (is_array($doctorTypes)) {
+            foreach ($doctorTypes as $typeData) {
+                $existingTypes = supabaseGet('doctor_types', [
+                    'department_id' => 'eq.' . $id,
+                    'type' => 'eq.' . ($typeData['type'] ?? ''),
+                    'limit' => 1,
+                ]);
+                
+                if (empty($existingTypes)) {
+                    $label = $typeData['label'] ?? (($typeData['type'] ?? '') === 'male' ? 'دكتور' : 'دكتورة');
+                    $enabled = $typeData['enabled'] ?? true;
+                    
+                    $newType = supabasePost('doctor_types', [
+                        'department_id' => $id,
+                        'type' => $typeData['type'] ?? null,
+                        'label' => $label,
+                        'enabled' => $enabled ? 1 : 0,
+                        'created_at' => nowIso(),
+                        'updated_at' => nowIso(),
+                    ], true);
+                    $doctorType = $newType[0] ?? $newType;
+                } else {
+                    $doctorType = $existingTypes[0];
+                    $typeUpdate = ['updated_at' => nowIso()];
+                    if (array_key_exists('enabled', $typeData)) {
+                        $typeUpdate['enabled'] = $typeData['enabled'] ? 1 : 0;
+                    }
+                    if (!empty($typeData['label'])) {
+                        $typeUpdate['label'] = $typeData['label'];
+                    }
+                    supabasePatch('doctor_types', $typeUpdate, ['id' => 'eq.' . $doctorType['id']], true);
+                }
+
+                // حذف المواعيد القديمة وإنشاء الجديدة
+                supabaseDelete('custom_slots', ['doctor_type_id' => 'eq.' . $doctorType['id']], true);
+                
+                if (!empty($typeData['custom_slots']) && is_array($typeData['custom_slots'])) {
+                    foreach ($typeData['custom_slots'] as $slot) {
+                        supabasePost('custom_slots', [
+                            'doctor_type_id' => $doctorType['id'],
+                            'date' => $slot['date'] ?? null,
+                            'capacity' => $slot['capacity'] ?? null,
+                            'from_time' => $slot['from_time'] ?? null,
+                            'to_time' => $slot['to_time'] ?? null,
+                            'created_at' => nowIso(),
+                            'updated_at' => nowIso(),
+                        ], true);
+                    }
+                }
+            }
+        }
+
+        // جلب القسم المحدث بالكامل
+        $departments = supabaseGet('departments', [
+            'id' => 'eq.' . $id,
+            'limit' => 1,
+        ]);
+        $updatedDepartment = $departments[0];
+        
+        $doctorTypesList = supabaseGet('doctor_types', [
+            'department_id' => 'eq.' . $id,
+        ]);
+        
+        $doctorTypesWithBookings = [];
+        foreach ($doctorTypesList as $dt) {
+            $dt['enabled'] = (bool) $dt['enabled'];
+            $slots = supabaseGet('custom_slots', [
+                'doctor_type_id' => 'eq.' . $dt['id'],
+            ]);
+            $dt['custom_slots'] = array_map(function ($slot) {
+                $currentBookings = countBookingsForSlotSupabase($slot['id']);
+                return array_merge($slot, [
+                    'current_bookings' => $currentBookings,
+                    'remaining' => $slot['capacity'] - $currentBookings,
+                    'available' => $currentBookings < $slot['capacity'],
+                ]);
+            }, $slots);
+            $doctorTypesWithBookings[] = $dt;
+        }
+
+        $updatedDepartment['doctor_types'] = $doctorTypesWithBookings;
+
+        jsonResponse([
+            'success' => true,
+            'department' => $updatedDepartment,
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Error saving department: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء حفظ القسم', 500);
+    }
+});
+
+// ============================
+// 6. Bookings
 // ============================
 
 route($routes, 'POST', '#^/api/bookings$#', function () {
@@ -681,6 +1032,68 @@ route($routes, 'GET', '#^/api/admin/bookings$#', function () {
     } catch (Exception $e) {
         error_log('❌ Error fetching admin bookings: ' . $e->getMessage());
         jsonError('حدث خطأ أثناء جلب الحجوزات', 500);
+    }
+});
+
+route($routes, 'GET', '#^/api/bookings/department/([^/]+)$#', function (array $p) {
+    $departmentId = $p[1];
+    
+    try {
+        $bookings = supabaseGet('bookings', [
+            'department_id' => 'eq.' . $departmentId,
+            'order' => 'created_at.desc',
+        ]);
+        
+        $formatted = array_map(function ($booking) {
+            $doctorType = supabaseGet('doctor_types', [
+                'id' => 'eq.' . $booking['doctor_type_id'],
+                'limit' => 1,
+            ]);
+            $slot = supabaseGet('custom_slots', [
+                'id' => 'eq.' . $booking['custom_slot_id'],
+                'limit' => 1,
+            ]);
+            
+            $currentBookings = $slot ? countBookingsForSlotSupabase($slot[0]['id']) : 0;
+            $capacity = $slot ? (int) $slot[0]['capacity'] : 0;
+            $from = $slot ? timeShort($slot[0]['from_time']) : null;
+            $to = $slot ? timeShort($slot[0]['to_time']) : null;
+            $timeLabel = $booking['booking_time'] ?: "$from - $to";
+
+            return [
+                'id' => $booking['id'],
+                'patient_name' => $booking['patient_name'],
+                'patient_age' => $booking['patient_age'],
+                'patient_phone' => $booking['patient_phone'],
+                'patient_gender' => $booking['patient_gender'],
+                'booking_date' => $booking['booking_date'],
+                'booking_time' => $booking['booking_time'],
+                'department' => [
+                    'id' => $booking['department_id'],
+                    'name' => null,
+                ],
+                'doctor' => [
+                    'id' => $doctorType[0]['id'] ?? null,
+                    'type' => $doctorType[0]['type'] ?? null,
+                    'label' => $doctorType[0]['label'] ?? 'غير معروف',
+                ],
+                'slot' => [
+                    'id' => $slot[0]['id'] ?? null,
+                    'from_time' => $from,
+                    'to_time' => $to,
+                    'capacity' => $capacity,
+                    'current_bookings' => $currentBookings,
+                    'remaining' => $capacity - $currentBookings,
+                ],
+                'created_at' => $booking['created_at'],
+                'summary' => "حجز {$booking['patient_name']} في {$booking['booking_date']} الفترة $timeLabel ($currentBookings/$capacity)",
+            ];
+        }, $bookings);
+
+        jsonResponse($formatted);
+    } catch (Exception $e) {
+        error_log('❌ Error fetching department bookings: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء جلب حجوزات القسم', 500);
     }
 });
 

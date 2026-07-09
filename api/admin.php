@@ -80,7 +80,9 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 // Admin dashboard
-require_once 'config/database.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/supabase.php';
+require_once __DIR__ . '/../helpers/http.php';
 $db = new Database();
 ?>
 

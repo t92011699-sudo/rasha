@@ -48,3 +48,20 @@ function getSupabaseConfig(): array
         'service_key' => SUPABASE_SERVICE_KEY,
     ];
 }
+
+class Database {
+    public function request($endpoint, $method = 'GET', $data = null, $useServiceKey = false) {
+        try {
+            $result = supabaseRequest($method, $endpoint, $data, [], $useServiceKey);
+            return [
+                'status' => 200,
+                'data' => $result
+            ];
+        } catch (Exception $e) {
+            return [
+                'status' => 500,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+}

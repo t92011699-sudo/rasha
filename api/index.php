@@ -16,7 +16,7 @@ require_once $root . '/helpers/supabase.php';
 // ===== CORS =====
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, apikey, Prefer');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -1190,8 +1190,7 @@ route($routes, 'GET', '#^/api/prices/categories$#', function () {
 
 // POST /api/prices - إضافة سعر (للأدمن)
 route($routes, 'POST', '#^/api/prices$#', function () {
-    // يمكن إضافة التحقق من التوكن هنا
-    // requireAuth();
+    requireAuth();
     
     $body = getJsonBody();
     
@@ -1236,7 +1235,7 @@ route($routes, 'POST', '#^/api/prices$#', function () {
 
 // PUT /api/prices/:id - تحديث سعر (للأدمن)
 route($routes, 'PUT', '#^/api/prices/([^/]+)$#', function (array $p) {
-    // requireAuth();
+    requireAuth();
     
     $id = $p[1];
     $body = getJsonBody();
@@ -1289,7 +1288,7 @@ route($routes, 'PUT', '#^/api/prices/([^/]+)$#', function (array $p) {
 
 // DELETE /api/prices/:id - حذف سعر (للأدمن)
 route($routes, 'DELETE', '#^/api/prices/([^/]+)$#', function (array $p) {
-    // requireAuth();
+    requireAuth();
     
     $id = $p[1];
     
@@ -1314,6 +1313,7 @@ route($routes, 'DELETE', '#^/api/prices/([^/]+)$#', function (array $p) {
         jsonError('حدث خطأ أثناء حذف السعر', 500);
     }
 });
+
 // ============================
 // Helper Functions
 // ============================

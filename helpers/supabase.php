@@ -2,12 +2,18 @@
 /**
  * ===== Supabase REST API Client for Vercel =====
  */
-
 function supabaseRequest(string $method, string $endpoint, array $data = null, array $filters = [], bool $useServiceKey = false): array
 {
     $config = getSupabaseConfig();
-    $url = rtrim($config['url'], '/') . '/rest/v1/' . ltrim($endpoint, '/');
     
+    // تنظيف الرابط الأساسي والتأكد من عدم تكرار /rest/v1
+    $baseUrl = rtrim($config['url'], '/');
+    if (!str_contains($baseUrl, '/rest/v1')) {
+        $baseUrl .= '/rest/v1';
+    }
+    
+    $url = $baseUrl . '/' . ltrim($endpoint, '/');
+
     if (!empty($filters)) {
         $queryParams = [];
         foreach ($filters as $key => $value) {
@@ -15,7 +21,7 @@ function supabaseRequest(string $method, string $endpoint, array $data = null, a
         }
         $url .= '?' . implode('&', $queryParams);
     }
-    
+
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -26,26 +32,26 @@ function supabaseRequest(string $method, string $endpoint, array $data = null, a
         'Content-Type: application/json',
         'Prefer: return=representation',
     ]);
-    
+
     if ($data !== null) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     }
-    
+
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $error = curl_error($ch);
     curl_close($ch);
-    
+
     if ($error) {
         throw new Exception('Supabase API Error: ' . $error);
     }
-    
+
     if ($httpCode >= 400) {
         $errorData = json_decode($response, true);
         $message = $errorData['message'] ?? $errorData['error'] ?? $response;
         throw new Exception('Supabase API Error (' . $httpCode . '): ' . $message);
     }
-    
+
     return json_decode($response, true) ?? [];
 }
 

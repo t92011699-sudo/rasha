@@ -1139,8 +1139,8 @@ route($routes, 'DELETE', '#^/api/bookings/([^/]+)$#', function (array $p) {
     }
 });
 
-// ============================
-// 7. Price Management (View Only)
+ // ============================
+// 7. Price Management
 // ============================
 
 // GET /api/prices - جلب جميع الأسعار (للجمهور)
@@ -1169,6 +1169,27 @@ route($routes, 'GET', '#^/api/prices$#', function () {
     }
 });
 
+// GET /api/prices/:id - جلب سعر محدد
+route($routes, 'GET', '#^/api/prices/([^/]+)$#', function (array $p) {
+    $id = $p[1];
+    
+    try {
+        $prices = supabaseGet('prices', [
+            'id' => 'eq.' . $id,
+            'limit' => 1,
+        ]);
+        
+        if (empty($prices)) {
+            jsonError('السعر غير موجود', 404);
+        }
+        
+        jsonResponse($prices[0]);
+    } catch (Exception $e) {
+        error_log('❌ Error fetching price: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء جلب السعر', 500);
+    }
+});
+
 // GET /api/prices/categories - جلب التصنيفات
 route($routes, 'GET', '#^/api/prices/categories$#', function () {
     try {
@@ -1188,7 +1209,7 @@ route($routes, 'GET', '#^/api/prices/categories$#', function () {
     }
 });
 
-// POST /api/prices - إضافة سعر (للأدمن)
+// POST /api/prices - إضافة سعر جديد (للأدمن) - موجودة
 route($routes, 'POST', '#^/api/prices$#', function () {
     requireAuth();
     
@@ -1233,8 +1254,56 @@ route($routes, 'POST', '#^/api/prices$#', function () {
     }
 });
 
-// PUT /api/prices/:id - تحديث سعر (للأدمن)
-route($routes, 'PUT', '#^/api/prices/([^/]+)$#', function (array $p) {
+// ✅ PUT /api/prices - إضافة سعر جديد (للأدمن) - مضافة جديدة
+route($routes, 'PUT', '#^/api/prices$#', function () {
+    requireAuth();
+    
+    $body = getJsonBody();
+    
+    if (empty(trim($body['label'] ?? ''))) {
+        jsonError('الاسم مطلوب', 400);
+    }
+    if (!isset($body['price']) || $body['price'] === '' || floatval($body['price']) < 0) {
+        jsonError('السعر مطلوب وقيمة موجبة', 400);
+    }
+    
+    try {
+        // جلب أعلى ترتيب
+        $existing = supabaseGet('prices', [
+            'select' => 'display_order',
+            'order' => 'display_order.desc',
+            'limit' => 1,
+        ]);
+        $nextOrder = empty($existing) ? 0 : intval($existing[0]['display_order']) + 1;
+        
+        $newPrice = supabasePost('prices', [
+            'label' => trim($body['label']),
+            'price' => floatval($body['price']),
+            'description' => isset($body['description']) ? trim($body['description']) : null,
+            'category' => isset($body['category']) ? trim($body['category']) : 'general',
+            'icon' => isset($body['icon']) ? trim($body['icon']) : null,
+            'is_active' => isset($body['is_active']) ? (bool)$body['is_active'] : true,
+            'display_order' => $nextOrder,
+            'created_at' => nowIso(),
+            'updated_at' => nowIso(),
+        ], true);
+        
+        jsonResponse([
+            'success' => true,
+            'message' => 'تم إضافة السعر بنجاح (PUT)',
+            'data' => $newPrice[0] ?? $newPrice
+        ], 201);
+    } catch (Exception $e) {
+        error_log('❌ Error creating price (PUT): ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء إضافة السعر', 500);
+    }
+});
+
+// ❌ PUT /api/prices/:id - تحديث سعر (للأدمن) - تم مسحها
+// route($routes, 'PUT', '#^/api/prices/([^/]+)$#', function ... { ... });
+
+// ✅ PATCH /api/prices/:id - تحديث سعر (للأدمن) - بدلاً من PUT
+route($routes, 'PATCH', '#^/api/prices/([^/]+)$#', function (array $p) {
     requireAuth();
     
     $id = $p[1];
@@ -1276,9 +1345,16 @@ route($routes, 'PUT', '#^/api/prices/([^/]+)$#', function (array $p) {
         
         supabasePatch('prices', $updateData, ['id' => 'eq.' . $id], true);
         
+        // جلب السعر بعد التحديث
+        $updated = supabaseGet('prices', [
+            'id' => 'eq.' . $id,
+            'limit' => 1,
+        ]);
+        
         jsonResponse([
             'success' => true,
-            'message' => 'تم تحديث السعر بنجاح'
+            'message' => 'تم تحديث السعر بنجاح',
+            'data' => $updated[0] ?? null
         ]);
     } catch (Exception $e) {
         error_log('❌ Error updating price: ' . $e->getMessage());

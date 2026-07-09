@@ -3,13 +3,5 @@
  * ===== Slots Helpers =====
  */
 
-// الدوال موجودة في api/index.php
-// هذا الملف للتوافق فقط
-
-function timeShort(?string $time): ?string
-{
-    if ($time === null) {
-        return null;
-    }
-    return substr($time, 0, 5);
-}
+// تم نقل الدوال إلى helpers/http.php أو api/index.php لتجنب التكرار
+// هذا الملف فارغ للتوافق مع عمليات الاستدعاء القديمة

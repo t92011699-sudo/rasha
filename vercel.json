@@ -1,8 +1,13 @@
  {
-  "rewrites": [
+  "functions": {
+    "api/index.php": {
+      "runtime": "now-php@1.0.0"
+    }
+  },
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/api/index.php"
+      "src": "/(.*)",
+      "dest": "/api/index.php"
     }
   ],
   "headers": [

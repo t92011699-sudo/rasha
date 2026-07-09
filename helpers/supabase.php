@@ -26,15 +26,12 @@ function supabaseRequest(string $method, string $endpoint, array $data = null, a
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
-    
-    // ✅ استخدام Authorization فقط (بدون apikey)
-    $headers = [
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'apikey: ' . ($useServiceKey ? $config['service_key'] : $config['anon_key']),
         'Authorization: Bearer ' . ($useServiceKey ? $config['service_key'] : $config['anon_key']),
         'Content-Type: application/json',
         'Prefer: return=representation',
-    ];
-    
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    ]);
 
     if ($data !== null) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));

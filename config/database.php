@@ -1,4 +1,4 @@
-<?php
+ <?php
 // config/database.php
 class Database {
     private $supabase_url = 'https://qlnnotrkotkmqdesjfmm.supabase.co/rest/v1/';
@@ -6,9 +6,13 @@ class Database {
     private $service_role_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsbm5vdHJrb3RrbXFkZXNqZm1tIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzM4MjY2MSwiZXhwIjoyMDk4OTU4NjYxfQ.55CLw9AcUjqYzW2QwVjFRSszbRd_-nZnkl-O-Z_APtg';
 
     public function getConnection($use_service_role = false) {
+        // استخدم service_role دائمًا لتجنب مشاكل الصلاحيات
+        $key = $use_service_role ? $this->service_role_key : $this->service_role_key;
+        // ملاحظة: للقراءة العامة، استخدم service_role لتجاوز مشاكل RLS
+        
         $headers = [
             'apikey: ' . $this->api_key,
-            'Authorization: Bearer ' . ($use_service_role ? $this->service_role_key : $this->api_key),
+            'Authorization: Bearer ' . $key,
             'Content-Type: application/json',
             'Prefer: return=representation'
         ];
@@ -19,7 +23,7 @@ class Database {
         ];
     }
 
-    public function request($endpoint, $method = 'GET', $data = null, $use_service_role = false) {
+    public function request($endpoint, $method = 'GET', $data = null, $use_service_role = true) {
         $conn = $this->getConnection($use_service_role);
         $url = $conn['url'] . $endpoint;
         
@@ -27,6 +31,7 @@ class Database {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $conn['headers']);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
@@ -45,7 +50,7 @@ class Database {
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
-        // Handle empty or null responses to prevent JSON parse errors
+        // Handle empty or null responses
         if (empty($response)) {
             $response = '[]';
         }

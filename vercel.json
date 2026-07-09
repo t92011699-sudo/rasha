@@ -1,9 +1,4 @@
-{
-  "functions": {
-    "api/index.php": {
-      "runtime": "php@8.2"
-    }
-  },
+ {
   "rewrites": [
     {
       "source": "/(.*)",

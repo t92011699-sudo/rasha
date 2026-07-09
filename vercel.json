@@ -3,5 +3,19 @@
     "api/*.php": {
       "runtime": "vercel-php@0.7.1"
     }
-  }
+  },
+  "routes": [
+    {
+      "src": "/api/departments/(.*)",
+      "dest": "/api/departments.php?id=$1"
+    },
+    {
+      "src": "/api/departments",
+      "dest": "/api/departments.php"
+    },
+    {
+      "src": "/api/bookings",
+      "dest": "/api/bookings.php"
+    }
+  ]
 }

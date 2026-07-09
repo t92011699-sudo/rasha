@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     } else {
         echo json_encode([]);
     }
+    exit();
 }
 
 // Handle POST request - create new appointment
@@ -60,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         echo json_encode(['status' => 'error', 'message' => 'Failed to create appointment']);
     }
+    exit();
 }
 
 // Handle DELETE request - cancel appointment (admin)
@@ -79,5 +81,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     } else {
         echo json_encode(['status' => 'error', 'message' => 'Failed to delete appointment']);
     }
+    exit();
 }
 ?>

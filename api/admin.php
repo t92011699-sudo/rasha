@@ -146,6 +146,7 @@ $db = new Database();
                 <a href="#" data-tab="calendar"><i class="fas fa-calendar"></i> التقويم</a>
                 <a href="#" data-tab="bookings"><i class="fas fa-list"></i> الحجوزات</a>
                 <a href="#" data-tab="departments"><i class="fas fa-building"></i> الأقسام</a>
+                <a href="#" data-tab="prices"><i class="fas fa-dollar-sign"></i> الأسعار</a>
                 <a href="?logout=1" class="text-danger"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</a>
             </div>
             
@@ -213,6 +214,78 @@ $db = new Database();
                     <button class="btn btn-primary mb-3" onclick="addDepartment()"><i class="fas fa-plus"></i> إضافة قسم جديد</button>
                     <div id="departmentsList"></div>
                 </div>
+
+                <!-- Prices Tab -->
+                <div id="prices" class="tab-content">
+                    <h3 class="mb-4"><i class="fas fa-dollar-sign"></i> إدارة الأسعار</h3>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <button class="btn btn-success" onclick="showAddPriceModal()">
+                                <i class="fas fa-plus"></i> إضافة سعر جديد
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <select id="priceCategoryFilter" class="form-select" onchange="loadPrices()">
+                                <option value="">جميع التصنيفات</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="btn btn-outline-secondary" onclick="loadPrices()">
+                                <i class="fas fa-sync"></i> تحديث
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="pricesList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Price Modal -->
+    <div class="modal fade" id="priceModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="priceModalTitle">إضافة سعر جديد</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="priceForm">
+                        <input type="hidden" id="priceId">
+                        <div class="mb-3">
+                            <label class="form-label">الاسم <span class="text-danger">*</span></label>
+                            <input type="text" id="priceLabel" class="form-control" required placeholder="مثال: كشف، سونار، أشعة مقطعية">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">السعر (جنيه) <span class="text-danger">*</span></label>
+                            <input type="number" id="priceAmount" class="form-control" step="0.01" min="0" required placeholder="0.00">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">التصنيف</label>
+                            <input type="text" id="priceCategory" class="form-control" placeholder="مثال: consultation, radiology, laboratory">
+                            <small class="text-muted">يمكنك إدخال أي تصنيف جديد وسيظهر تلقائياً في الفلتر</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">أيقونة (Font Awesome)</label>
+                            <input type="text" id="priceIcon" class="form-control" placeholder="مثال: fa-stethoscope, fa-microscope">
+                            <small class="text-muted">اختياري - لعرض أيقونة بجانب السعر</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">وصف</label>
+                            <textarea id="priceDescription" class="form-control" rows="2" placeholder="وصف اختياري للخدمة"></textarea>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" id="priceActive" class="form-check-input" checked>
+                            <label class="form-check-label">مفعل (ظهر في القائمة)</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="button" class="btn btn-primary" onclick="savePrice()">حفظ</button>
+                </div>
             </div>
         </div>
     </div>
@@ -232,6 +305,7 @@ $db = new Database();
                 if (tab === 'calendar') loadAdminCalendar();
                 if (tab === 'bookings') loadAllBookings();
                 if (tab === 'departments') loadDepartments();
+                if (tab === 'prices') loadPrices();
             });
         });
 
@@ -354,6 +428,294 @@ $db = new Database();
                 .then(() => loadDepartments());
             }
         }
+
+        // ===== Price Management Functions =====
+        
+        function loadPrices() {
+            const category = document.getElementById('priceCategoryFilter').value;
+            let url = 'api/prices.php';
+            const params = new URLSearchParams();
+            if (category) params.append('category', category);
+            params.append('active_only', 'false');
+            if (params.toString()) url += '?' + params.toString();
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('pricesList');
+                    if (!data || !data.length) {
+                        container.innerHTML = `
+                            <div class="alert alert-info text-center">
+                                <i class="fas fa-info-circle"></i> لا توجد أسعار مسجلة
+                                <br><button class="btn btn-sm btn-success mt-2" onclick="showAddPriceModal()">
+                                    <i class="fas fa-plus"></i> أضف أول سعر
+                                </button>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    let html = `
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>الاسم</th>
+                                        <th>السعر</th>
+                                        <th>التصنيف</th>
+                                        <th>الأيقونة</th>
+                                        <th>الحالة</th>
+                                        <th>الترتيب</th>
+                                        <th>إجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    data.forEach((price, index) => {
+                        const isActive = price.is_active !== false;
+                        html += `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>
+                                    ${price.icon ? `<i class="fas ${price.icon}"></i> ` : ''}
+                                    <strong>${price.label}</strong>
+                                    ${price.description ? `<br><small class="text-muted">${price.description}</small>` : ''}
+                                </td>
+                                <td><strong class="text-success">${Number(price.price).toFixed(2)} ج.م</strong></td>
+                                <td><span class="badge bg-info">${price.category || 'عام'}</span></td>
+                                <td>${price.icon ? `<i class="fas ${price.icon} fa-lg"></i>` : '-'}</td>
+                                <td>
+                                    <span class="badge bg-${isActive ? 'success' : 'danger'}">
+                                        ${isActive ? 'مفعل' : 'غير مفعل'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-secondary" onclick="movePrice(${price.id}, 'up')">
+                                            <i class="fas fa-arrow-up"></i>
+                                        </button>
+                                        <button class="btn btn-outline-secondary" onclick="movePrice(${price.id}, 'down')">
+                                            <i class="fas fa-arrow-down"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning" onclick="editPrice(${price.id})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deletePrice(${price.id}, '${price.label}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += '</tbody></table></div>';
+                    container.innerHTML = html;
+                    
+                    updateCategoryFilter(data);
+                })
+                .catch(error => {
+                    console.error('Error loading prices:', error);
+                    document.getElementById('pricesList').innerHTML = 
+                        '<div class="alert alert-danger">حدث خطأ في تحميل الأسعار</div>';
+                });
+        }
+
+        function updateCategoryFilter(data) {
+            const filter = document.getElementById('priceCategoryFilter');
+            const categories = [...new Set(data.map(p => p.category).filter(c => c && c.trim()))];
+            const currentValue = filter.value;
+            
+            const existingOptions = {};
+            filter.querySelectorAll('option').forEach(opt => {
+                if (opt.value) existingOptions[opt.value] = true;
+            });
+            
+            categories.forEach(cat => {
+                if (!existingOptions[cat]) {
+                    const option = document.createElement('option');
+                    option.value = cat;
+                    option.textContent = cat;
+                    filter.appendChild(option);
+                }
+            });
+            
+            filter.value = currentValue;
+        }
+
+        function showAddPriceModal() {
+            document.getElementById('priceModalTitle').textContent = 'إضافة سعر جديد';
+            document.getElementById('priceForm').reset();
+            document.getElementById('priceId').value = '';
+            document.getElementById('priceActive').checked = true;
+            new bootstrap.Modal(document.getElementById('priceModal')).show();
+        }
+
+        function editPrice(id) {
+            fetch(`api/prices.php?id=${id}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data || !data.length) {
+                        alert('السعر غير موجود');
+                        return;
+                    }
+                    const price = data[0];
+                    document.getElementById('priceModalTitle').textContent = 'تعديل السعر';
+                    document.getElementById('priceId').value = price.id;
+                    document.getElementById('priceLabel').value = price.label;
+                    document.getElementById('priceAmount').value = price.price;
+                    document.getElementById('priceCategory').value = price.category || '';
+                    document.getElementById('priceIcon').value = price.icon || '';
+                    document.getElementById('priceDescription').value = price.description || '';
+                    document.getElementById('priceActive').checked = price.is_active !== false;
+                    new bootstrap.Modal(document.getElementById('priceModal')).show();
+                })
+                .catch(error => {
+                    console.error('Error fetching price:', error);
+                    alert('حدث خطأ في جلب بيانات السعر');
+                });
+        }
+
+        function savePrice() {
+            const id = document.getElementById('priceId').value;
+            const label = document.getElementById('priceLabel').value.trim();
+            const price = document.getElementById('priceAmount').value;
+            const category = document.getElementById('priceCategory').value.trim();
+            const icon = document.getElementById('priceIcon').value.trim();
+            const description = document.getElementById('priceDescription').value.trim();
+            const isActive = document.getElementById('priceActive').checked;
+            
+            if (!label) {
+                alert('الاسم مطلوب');
+                document.getElementById('priceLabel').focus();
+                return;
+            }
+            if (!price || parseFloat(price) < 0) {
+                alert('السعر مطلوب وقيمة موجبة');
+                document.getElementById('priceAmount').focus();
+                return;
+            }
+            
+            const data = {
+                label: label,
+                price: parseFloat(price),
+                category: category || 'general',
+                icon: icon || null,
+                description: description || null,
+                is_active: isActive
+            };
+            
+            let url = 'api/prices.php';
+            let method = 'POST';
+            
+            if (id) {
+                url += `?id=${id}`;
+                method = 'PUT';
+            }
+            
+            fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'success' || result.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('priceModal')).hide();
+                    loadPrices();
+                    alert(result.message || 'تم الحفظ بنجاح');
+                } else {
+                    alert(result.message || 'حدث خطأ');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving price:', error);
+                alert('حدث خطأ في حفظ السعر');
+            });
+        }
+
+        function deletePrice(id, label) {
+            if (!confirm(`هل أنت متأكد من حذف السعر "${label}"؟`)) {
+                return;
+            }
+            
+            fetch(`api/prices.php?id=${id}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'success' || result.success) {
+                    loadPrices();
+                    alert(result.message || 'تم الحذف بنجاح');
+                } else {
+                    alert(result.message || 'حدث خطأ في حذف السعر');
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting price:', error);
+                alert('حدث خطأ في حذف السعر');
+            });
+        }
+
+        function movePrice(id, direction) {
+            const category = document.getElementById('priceCategoryFilter').value;
+            let url = 'api/prices.php';
+            const params = new URLSearchParams();
+            if (category) params.append('category', category);
+            params.append('active_only', 'false');
+            if (params.toString()) url += '?' + params.toString();
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const index = data.findIndex(p => p.id === id);
+                    if (index === -1) return;
+                    
+                    const newIndex = direction === 'up' ? index - 1 : index + 1;
+                    if (newIndex < 0 || newIndex >= data.length) return;
+                    
+                    const current = data[index];
+                    const target = data[newIndex];
+                    
+                    const currentOrder = current.display_order || index;
+                    const targetOrder = target.display_order || newIndex;
+                    
+                    const updates = [
+                        { id: current.id, order: targetOrder },
+                        { id: target.id, order: currentOrder }
+                    ];
+                    
+                    let completed = 0;
+                    updates.forEach(update => {
+                        fetch(`api/prices.php?id=${update.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ display_order: update.order })
+                        })
+                        .then(response => response.json())
+                        .then(() => {
+                            completed++;
+                            if (completed === updates.length) {
+                                loadPrices();
+                            }
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('Error moving price:', error);
+                });
+        }
+
+        // تحميل الأسعار عند فتح الصفحة
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.getElementById('prices')) {
+                loadPrices();
+            }
+        });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

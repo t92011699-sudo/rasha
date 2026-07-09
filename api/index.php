@@ -1140,6 +1140,181 @@ route($routes, 'DELETE', '#^/api/bookings/([^/]+)$#', function (array $p) {
 });
 
 // ============================
+// 7. Price Management (View Only)
+// ============================
+
+// GET /api/prices - جلب جميع الأسعار (للجمهور)
+route($routes, 'GET', '#^/api/prices$#', function () {
+    try {
+        $category = $_GET['category'] ?? null;
+        $activeOnly = isset($_GET['active_only']) ? filter_var($_GET['active_only'], FILTER_VALIDATE_BOOLEAN) : true;
+        
+        $filters = [
+            'select' => '*',
+            'order' => 'display_order.asc,label.asc'
+        ];
+        
+        if ($category) {
+            $filters['category'] = 'eq.' . $category;
+        }
+        if ($activeOnly) {
+            $filters['is_active'] = 'eq.true';
+        }
+        
+        $prices = supabaseGet('prices', $filters);
+        jsonResponse($prices);
+    } catch (Exception $e) {
+        error_log('❌ Error fetching prices: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء جلب الأسعار', 500);
+    }
+});
+
+// GET /api/prices/categories - جلب التصنيفات
+route($routes, 'GET', '#^/api/prices/categories$#', function () {
+    try {
+        $prices = supabaseGet('prices', [
+            'select' => 'category',
+            'is_active' => 'eq.true',
+        ]);
+        
+        $categories = array_unique(array_column($prices, 'category'));
+        $categories = array_filter($categories, function($cat) { return !empty($cat); });
+        sort($categories);
+        
+        jsonResponse($categories);
+    } catch (Exception $e) {
+        error_log('❌ Error fetching categories: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء جلب التصنيفات', 500);
+    }
+});
+
+// POST /api/prices - إضافة سعر (للأدمن)
+route($routes, 'POST', '#^/api/prices$#', function () {
+    // يمكن إضافة التحقق من التوكن هنا
+    // requireAuth();
+    
+    $body = getJsonBody();
+    
+    if (empty(trim($body['label'] ?? ''))) {
+        jsonError('الاسم مطلوب', 400);
+    }
+    if (!isset($body['price']) || $body['price'] === '' || floatval($body['price']) < 0) {
+        jsonError('السعر مطلوب وقيمة موجبة', 400);
+    }
+    
+    try {
+        // جلب أعلى ترتيب
+        $existing = supabaseGet('prices', [
+            'select' => 'display_order',
+            'order' => 'display_order.desc',
+            'limit' => 1,
+        ]);
+        $nextOrder = empty($existing) ? 0 : intval($existing[0]['display_order']) + 1;
+        
+        $newPrice = supabasePost('prices', [
+            'label' => trim($body['label']),
+            'price' => floatval($body['price']),
+            'description' => isset($body['description']) ? trim($body['description']) : null,
+            'category' => isset($body['category']) ? trim($body['category']) : 'general',
+            'icon' => isset($body['icon']) ? trim($body['icon']) : null,
+            'is_active' => isset($body['is_active']) ? (bool)$body['is_active'] : true,
+            'display_order' => $nextOrder,
+            'created_at' => nowIso(),
+            'updated_at' => nowIso(),
+        ], true);
+        
+        jsonResponse([
+            'success' => true,
+            'message' => 'تم إضافة السعر بنجاح',
+            'data' => $newPrice[0] ?? $newPrice
+        ], 201);
+    } catch (Exception $e) {
+        error_log('❌ Error creating price: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء إضافة السعر', 500);
+    }
+});
+
+// PUT /api/prices/:id - تحديث سعر (للأدمن)
+route($routes, 'PUT', '#^/api/prices/([^/]+)$#', function (array $p) {
+    // requireAuth();
+    
+    $id = $p[1];
+    $body = getJsonBody();
+    
+    $updateData = ['updated_at' => nowIso()];
+    
+    if (isset($body['label'])) {
+        $updateData['label'] = trim($body['label']);
+    }
+    if (isset($body['price']) && $body['price'] !== '') {
+        $updateData['price'] = floatval($body['price']);
+    }
+    if (array_key_exists('description', $body)) {
+        $updateData['description'] = isset($body['description']) ? trim($body['description']) : null;
+    }
+    if (array_key_exists('category', $body)) {
+        $updateData['category'] = isset($body['category']) ? trim($body['category']) : 'general';
+    }
+    if (array_key_exists('icon', $body)) {
+        $updateData['icon'] = isset($body['icon']) ? trim($body['icon']) : null;
+    }
+    if (array_key_exists('is_active', $body)) {
+        $updateData['is_active'] = (bool)$body['is_active'];
+    }
+    if (array_key_exists('display_order', $body)) {
+        $updateData['display_order'] = intval($body['display_order']);
+    }
+    
+    try {
+        $existing = supabaseGet('prices', [
+            'id' => 'eq.' . $id,
+            'limit' => 1,
+        ]);
+        
+        if (empty($existing)) {
+            jsonError('السعر غير موجود', 404);
+        }
+        
+        supabasePatch('prices', $updateData, ['id' => 'eq.' . $id], true);
+        
+        jsonResponse([
+            'success' => true,
+            'message' => 'تم تحديث السعر بنجاح'
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Error updating price: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء تحديث السعر', 500);
+    }
+});
+
+// DELETE /api/prices/:id - حذف سعر (للأدمن)
+route($routes, 'DELETE', '#^/api/prices/([^/]+)$#', function (array $p) {
+    // requireAuth();
+    
+    $id = $p[1];
+    
+    try {
+        $existing = supabaseGet('prices', [
+            'id' => 'eq.' . $id,
+            'limit' => 1,
+        ]);
+        
+        if (empty($existing)) {
+            jsonError('السعر غير موجود', 404);
+        }
+        
+        supabaseDelete('prices', ['id' => 'eq.' . $id], true);
+        
+        jsonResponse([
+            'success' => true,
+            'message' => 'تم حذف السعر بنجاح'
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Error deleting price: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء حذف السعر', 500);
+    }
+});
+// ============================
 // Helper Functions
 // ============================
 

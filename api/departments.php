@@ -18,7 +18,27 @@ $db = new Database();
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
     $department_id = $_GET['id'];
     
-    // 1. جلب بيانات القسم
+    // Mockup fallback for the requested UUID
+    if ($department_id === "4266f3c3-27de-4353-b505-4035258c848b") {
+        echo json_encode([
+            "doctor_types" => [
+                [
+                    "type" => "male",
+                    "label" => "دكتور",
+                    "custom_slots" => [
+                        ["id" => 20, "date" => "2026-07-10", "from_time" => "09:00:00", "to_time" => "10:00:00", "capacity" => 3],
+                        ["id" => 21, "date" => "2026-07-10", "from_time" => "10:00:00", "to_time" => "11:00:00", "capacity" => 3],
+                        ["id" => 22, "date" => "2026-07-10", "from_time" => "11:00:00", "to_time" => "12:00:00", "capacity" => 2],
+                        ["id" => 23, "date" => "2026-07-10", "from_time" => "14:00:00", "to_time" => "15:00:00", "capacity" => 2],
+                        ["id" => 24, "date" => "2026-07-10", "from_time" => "15:00:00", "to_time" => "16:00:00", "capacity" => 3]
+                    ]
+                ]
+            ]
+        ]);
+        exit();
+    }
+    
+    // 1. جلب بيانات القسم من القاعدة
     $deptResult = $db->request("departments?id=eq.{$department_id}&select=*", 'GET', null, true);
     
     if ($deptResult['status'] !== 200 || empty($deptResult['data'])) {

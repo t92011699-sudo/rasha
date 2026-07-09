@@ -1,5 +1,5 @@
-<?php
-// api/admin-appointments.php
+ <?php
+// api/admin-appointments.php (تحديث طفيف)
 require_once '../config/database.php';
 
 header('Content-Type: application/json');
@@ -14,24 +14,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $db = new Database();
 
-// Get all appointments
+// جلب جميع الحجوزات مع إمكانية الفلترة حسب القسم
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $result = $db->request('appointments?select=*&order=date.asc,time.asc', 'GET', null, true);
+    $department_id = isset($_GET['department_id']) ? intval($_GET['department_id']) : null;
+    $query = 'appointments?select=*&order=date.asc,time.asc';
+    
+    if ($department_id) {
+        $query .= "&department_id=eq.{$department_id}";
+    }
+    
+    $result = $db->request($query, 'GET', null, true);
     
     if ($result['status'] === 200) {
         echo json_encode($result['data']);
     } else {
         echo json_encode([]);
     }
+    exit();
 }
 
-// Update appointment status
+// تحديث حالة الحجز
 if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     parse_str($_SERVER['QUERY_STRING'], $params);
-    $id = isset($params['id']) ? $params['id'] : '';
+    $id = intval($params['id'] ?? 0);
     
     if (empty($id)) {
-        echo json_encode(['status' => 'error', 'message' => 'Appointment ID is required']);
+        echo json_encode(['status' => 'error', 'message' => 'معرف الحجز مطلوب']);
         exit();
     }
     
@@ -39,28 +47,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $result = $db->request("appointments?id=eq.{$id}", 'PATCH', $data, true);
     
     if ($result['status'] === 200) {
-        echo json_encode(['status' => 'success', 'message' => 'Appointment updated successfully']);
+        echo json_encode(['status' => 'success', 'message' => 'تم تحديث الحجز بنجاح']);
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Failed to update appointment']);
+        echo json_encode(['status' => 'error', 'message' => 'فشل في تحديث الحجز']);
     }
+    exit();
 }
 
-// Delete appointment
+// حذف حجز
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     parse_str($_SERVER['QUERY_STRING'], $params);
-    $id = isset($params['id']) ? $params['id'] : '';
+    $id = intval($params['id'] ?? 0);
     
     if (empty($id)) {
-        echo json_encode(['status' => 'error', 'message' => 'Appointment ID is required']);
+        echo json_encode(['status' => 'error', 'message' => 'معرف الحجز مطلوب']);
         exit();
     }
     
     $result = $db->request("appointments?id=eq.{$id}", 'DELETE', null, true);
     
     if ($result['status'] === 204) {
-        echo json_encode(['status' => 'success', 'message' => 'Appointment deleted successfully']);
+        echo json_encode(['status' => 'success', 'message' => 'تم حذف الحجز بنجاح']);
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Failed to delete appointment']);
+        echo json_encode(['status' => 'error', 'message' => 'فشل في حذف الحجز']);
     }
+    exit();
 }
 ?>

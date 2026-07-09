@@ -7,6 +7,7 @@ function supabaseRequest(string $method, string $endpoint, array $data = null, a
 {
     $config = getSupabaseConfig();
     $url = $config['url'] . '/rest/v1/' . ltrim($endpoint, '/');
+    error_log('DEBUG: Supabase URL: ' . $url);
     
     if (!empty($filters)) {
         $queryParams = [];

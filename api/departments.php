@@ -1,4 +1,4 @@
- <?php
+<?php
 // api/departments.php
 require_once __DIR__ . '/../config/database.php';
 
@@ -22,8 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
     $deptResult = $db->request("departments?id=eq.{$department_id}&select=*", 'GET', null, true);
     
     if ($deptResult['status'] !== 200 || empty($deptResult['data'])) {
-        echo json_encode(['status' => 'error', 'message' => 'القسم غير موجود']);
         http_response_code(404);
+        echo json_encode(['status' => 'error', 'message' => 'القسم غير موجود']);
         exit();
     }
     

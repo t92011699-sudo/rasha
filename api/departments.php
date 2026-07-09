@@ -14,15 +14,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $db = new Database();
 
-// جلب قسم محدد مع تفاصيله
+// جلب قسم محدد مع تفاصيله (يدعم معرف UUID أو رقمي)
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
-    $department_id = intval($_GET['id']);
+    $department_id = $_GET['id'];
     
     // 1. جلب بيانات القسم
     $deptResult = $db->request("departments?id=eq.{$department_id}&select=*", 'GET', null, true);
     
     if ($deptResult['status'] !== 200 || empty($deptResult['data'])) {
         echo json_encode(['status' => 'error', 'message' => 'القسم غير موجود']);
+        http_response_code(404);
         exit();
     }
     
@@ -36,10 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
     $slotsResult = $db->request("custom_slots?department_id=eq.{$department_id}&select=*", 'GET', null, true);
     $customSlots = $slotsResult['status'] === 200 ? $slotsResult['data'] : [];
     
-    // 4. تنظيم البيانات
+    // 4. تنظيم البيانات بالصيغة المطلوبة
     $response = [
-        'name' => $department['name'],
-        'icon_url' => $department['icon_url'] ?? 'https://example.com/icons/default.svg',
         'doctor_types' => []
     ];
     
@@ -61,7 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
         $response['doctor_types'][] = [
             'type' => $type['type'],
             'label' => $type['label'],
-            'enabled' => $type['enabled'] ?? true,
             'custom_slots' => $formattedSlots
         ];
     }

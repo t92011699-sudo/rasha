@@ -1,4 +1,4 @@
- <?php
+<?php
 // api/bookings.php
 require_once __DIR__ . '/../config/database.php';
 
@@ -21,7 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // التحقق من البيانات المطلوبة
     $required = ['department_id', 'doctor_type', 'slot_id', 'booking_date', 'booking_time', 'patient_name', 'patient_age', 'patient_phone'];
     foreach ($required as $field) {
-        if (!isset($data[$field]) || empty($data[$field])) {
+        if (!isset($data[$field]) || (is_string($data[$field]) && empty($data[$field]))) {
+            http_response_code(400);
             echo json_encode(['status' => 'error', 'message' => "الحقل {$field} مطلوب"]);
             exit();
         }
@@ -31,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $slot_id = intval($data['slot_id']);
     $slotResult = $db->request("custom_slots?id=eq.{$slot_id}&select=*", 'GET', null, true);
     if ($slotResult['status'] !== 200 || empty($slotResult['data'])) {
+        http_response_code(404);
         echo json_encode(['status' => 'error', 'message' => 'الفترة المحددة غير موجودة']);
         exit();
     }
@@ -39,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // 2. التحقق من أن الفترة تابعة للقسم ونوع الطبيب
     if (intval($slot['department_id']) !== intval($data['department_id']) || $slot['doctor_type'] !== $data['doctor_type']) {
+        http_response_code(400);
         echo json_encode(['status' => 'error', 'message' => 'بيانات الفترة غير متطابقة']);
         exit();
     }
@@ -54,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $currentBookings = isset($bookingCountResult['data'][0]['count']) ? intval($bookingCountResult['data'][0]['count']) : 0;
     
     if ($currentBookings >= intval($slot['capacity'])) {
+        http_response_code(409);
         echo json_encode(['status' => 'error', 'message' => 'لا توجد سعة متاحة في هذا الوقت']);
         exit();
     }
@@ -67,18 +71,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'time' => $data['booking_time'],
         'status' => 'pending',
         'department_id' => intval($data['department_id']),
-        'notes' => "نوع الطبيب: {$data['doctor_type']}, الجنس: {$data['patient_gender']}"
+        'notes' => "نوع الطبيب: {$data['doctor_type']}, الجنس: {$data['patient_gender'] ?? 'N/A'}"
     ];
     
     $result = $db->request('appointments', 'POST', $appointmentData, true);
     
     if ($result['status'] === 201) {
+        http_response_code(201);
         echo json_encode([
             'status' => 'success',
             'message' => 'تم حجز الموعد بنجاح',
-            'booking_id' => $result['data'][0]['id'] ?? null
+            'booking_id' => $result['data'][0]['id'] ?? null,
+            'data' => $result['data'][0] ?? null
         ]);
     } else {
+        http_response_code(500);
         echo json_encode(['status' => 'error', 'message' => 'فشل في إنشاء الحجز']);
     }
     exit();
@@ -113,11 +120,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     $id = intval($params['id'] ?? 0);
     
     if (empty($id)) {
+        http_response_code(400);
         echo json_encode(['status' => 'error', 'message' => 'معرف الحجز مطلوب']);
         exit();
     }
     
     $result = $db->request("appointments?id=eq.{$id}", 'PATCH', ['status' => 'cancelled'], true);
+    
+    if ($result['status'] === 200) {
+        http_response_code(200);
+    } else {
+        http_response_code(404);
+    }
     
     echo json_encode([
         'status' => $result['status'] === 200 ? 'success' : 'error',

@@ -1,6 +1,6 @@
 <?php
 /**
- * ===== General HTTP helper utilities =====
+ * ===== HTTP Helper Utilities =====
  */
 
 function jsonResponse($data, int $status = 200): void
@@ -31,9 +31,6 @@ function nowIso(): string
     return (new DateTime('now', new DateTimeZone('UTC')))->format(DateTime::ATOM);
 }
 
-/**
- * Trims a time value to its first 5 characters, e.g. "14:30:00" -> "14:30"
- */
 function timeShort(?string $time): ?string
 {
     if ($time === null) {

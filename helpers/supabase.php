@@ -1,18 +1,13 @@
 <?php
 /**
- * ===== Supabase REST API Client =====
- * تواصل مباشر مع Supabase عبر REST API
+ * ===== Supabase REST API Client for Vercel =====
  */
 
-/**
- * تنفيذ طلب إلى Supabase
- */
 function supabaseRequest(string $method, string $endpoint, array $data = null, array $filters = [], bool $useServiceKey = false): array
 {
     $config = getSupabaseConfig();
     $url = $config['url'] . '/rest/v1/' . ltrim($endpoint, '/');
     
-    // بناء معاملات التصفية
     if (!empty($filters)) {
         $queryParams = [];
         foreach ($filters as $key => $value) {
@@ -54,60 +49,27 @@ function supabaseRequest(string $method, string $endpoint, array $data = null, a
     return json_decode($response, true) ?? [];
 }
 
-/**
- * GET - جلب البيانات
- */
 function supabaseGet(string $endpoint, array $filters = [], bool $useServiceKey = false): array
 {
     return supabaseRequest('GET', $endpoint, null, $filters, $useServiceKey);
 }
 
-/**
- * POST - إنشاء بيانات جديدة
- */
 function supabasePost(string $endpoint, array $data, bool $useServiceKey = false): array
 {
     return supabaseRequest('POST', $endpoint, $data, [], $useServiceKey);
 }
 
-/**
- * PUT - تحديث كامل
- */
 function supabasePut(string $endpoint, array $data, array $filters = [], bool $useServiceKey = false): array
 {
     return supabaseRequest('PUT', $endpoint, $data, $filters, $useServiceKey);
 }
 
-/**
- * PATCH - تحديث جزئي
- */
 function supabasePatch(string $endpoint, array $data, array $filters = [], bool $useServiceKey = false): array
 {
     return supabaseRequest('PATCH', $endpoint, $data, $filters, $useServiceKey);
 }
 
-/**
- * DELETE - حذف بيانات
- */
 function supabaseDelete(string $endpoint, array $filters = [], bool $useServiceKey = false): array
 {
     return supabaseRequest('DELETE', $endpoint, null, $filters, $useServiceKey);
-}
-
-/**
- * بناء معاملات التصفية لـ Supabase
- */
-function buildFilters(array $params): array
-{
-    $filters = [];
-    foreach ($params as $key => $value) {
-        if (is_array($value)) {
-            foreach ($value as $operator => $val) {
-                $filters[$key . '=' . $operator . '.' . $val] = null;
-            }
-        } else {
-            $filters[$key . '=eq.' . $value] = null;
-        }
-    }
-    return array_keys($filters);
 }

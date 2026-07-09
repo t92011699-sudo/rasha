@@ -1,7 +1,6 @@
 <?php
 /**
- * ===== Supabase Connection =====
- * استخدام REST API بدلاً من PDO
+ * ===== Supabase Connection for Vercel =====
  */
 
 function loadEnv(string $path): void
@@ -24,9 +23,13 @@ function loadEnv(string $path): void
     }
 }
 
-loadEnv(__DIR__ . '/../.env');
+// تحميل .env من المسار الصحيح
+$envPath = __DIR__ . '/../.env';
+if (file_exists($envPath)) {
+    loadEnv($envPath);
+}
 
-// ===== Supabase Configuration =====
+// متغيرات Supabase - استخدام getenv() للتوافق مع Vercel
 define('SUPABASE_URL', getenv('SUPABASE_URL') ?: 'https://qlnnotrkotkmqdesjfmm.supabase.co');
 define('SUPABASE_ANON_KEY', getenv('SUPABASE_ANON_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsbm5vdHJrb3RrbXFkZXNqZm1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzODI2NjEsImV4cCI6MjA5ODk1ODY2MX0.gbHxqDfz5Gj2rci_s-ht0KxUZ6qS1jbpkM3v1_M2fDM');
 define('SUPABASE_SERVICE_KEY', getenv('SUPABASE_SERVICE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsbm5vdHJrb3RrbXFkZXNqZm1tIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzM4MjY2MSwiZXhwIjoyMDk4OTU4NjYxfQ.55CLw9AcUjqYzW2QwVjFRSszbRd_-nZnkl-O-Z_APtg');

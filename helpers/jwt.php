@@ -1,7 +1,6 @@
 <?php
 /**
- * ===== Minimal JWT (HS256) implementation, no external libraries =====
- * Enough to sign and verify tokens, matching the original code (jsonwebtoken)
+ * ===== Minimal JWT (HS256) implementation =====
  */
 
 function base64UrlEncode(string $data): string
@@ -18,11 +17,6 @@ function base64UrlDecode(string $data): string
     return base64_decode(strtr($data, '-_', '+/'));
 }
 
-/**
- * @param array $payload  token data (id, email, role...)
- * @param string $secret  signing secret
- * @param int $expiresInSeconds  lifetime in seconds (default 7 days, as in the original)
- */
 function jwtSign(array $payload, string $secret, int $expiresInSeconds = 7 * 24 * 60 * 60): string
 {
     $header = ['alg' => 'HS256', 'typ' => 'JWT'];
@@ -41,9 +35,6 @@ function jwtSign(array $payload, string $secret, int $expiresInSeconds = 7 * 24 
     return implode('.', $segments);
 }
 
-/**
- * Verifies the token and returns its payload, or null if invalid/expired
- */
 function jwtVerify(string $token, string $secret): ?array
 {
     $parts = explode('.', $token);
@@ -66,30 +57,7 @@ function jwtVerify(string $token, string $secret): ?array
     }
 
     if (isset($payload['exp']) && time() > $payload['exp']) {
-        return null; // expired
-    }
-
-    return $payload;
-}
-
-/**
- * Extracts the token from the "Authorization: Bearer xxx" header and verifies it.
- * Used as an optional middleware on protected routes.
- */
-function requireAdminAuth(): array
-{
-    $headers = getallheaders();
-    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-
-    if (!$authHeader || !str_starts_with($authHeader, 'Bearer ')) {
-        jsonError('غير مصرح - التوكن مطلوب', 401);
-    }
-
-    $token = substr($authHeader, 7);
-    $payload = jwtVerify($token, JWT_SECRET);
-
-    if (!$payload) {
-        jsonError('التوكن غير صالح أو منتهي الصلاحية', 401);
+        return null;
     }
 
     return $payload;

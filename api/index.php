@@ -1,4 +1,4 @@
-<?php
+ <?php
 // index.php - الصفحة الرئيسية للمرضى
 ?>
 <!DOCTYPE html>

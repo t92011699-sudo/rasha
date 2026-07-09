@@ -1,4 +1,4 @@
-<?php
+ <?php
 // admin.php - لوحة تحكم المشرف
 session_start();
 

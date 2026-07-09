@@ -1,6 +1,6 @@
-<?php
-// api/bookings.php (ملف جديد)
-require_once '../config/database.php';
+ <?php
+// api/bookings.php
+require_once __DIR__ . '/../config/database.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // 1. التحقق من وجود الفترة المخصصة (custom_slots)
+    // 1. التحقق من وجود الفترة المخصصة
     $slot_id = intval($data['slot_id']);
     $slotResult = $db->request("custom_slots?id=eq.{$slot_id}&select=*", 'GET', null, true);
     if ($slotResult['status'] !== 200 || empty($slotResult['data'])) {
@@ -37,13 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $slot = $slotResult['data'][0];
     
-    // 2. التحقق من أن الفترة تابعة للقسم ونوع الطبيب المطلوب
+    // 2. التحقق من أن الفترة تابعة للقسم ونوع الطبيب
     if (intval($slot['department_id']) !== intval($data['department_id']) || $slot['doctor_type'] !== $data['doctor_type']) {
-        echo json_encode(['status' => 'error', 'message' => 'بيانات الفترة غير متطابقة مع القسم أو نوع الطبيب']);
+        echo json_encode(['status' => 'error', 'message' => 'بيانات الفترة غير متطابقة']);
         exit();
     }
     
-    // 3. التحقق من السعة المتبقية (عدد الحجوزات في نفس الفترة)
+    // 3. التحقق من السعة المتبقية
     $bookingCountResult = $db->request(
         "appointments?department_id=eq.{$data['department_id']}&date=eq.{$data['booking_date']}&time=eq.{$data['booking_time']}&status=neq.cancelled&select=count",
         'GET',
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
     
-    // 4. إنشاء الحجز في جدول appointments
+    // 4. إنشاء الحجز
     $appointmentData = [
         'name' => $data['patient_name'],
         'phone' => $data['patient_phone'],
@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     exit();
 }
 
-// إلغاء حجز (للمشرف أو المريض)
+// إلغاء حجز
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     parse_str($_SERVER['QUERY_STRING'], $params);
     $id = intval($params['id'] ?? 0);
@@ -117,7 +117,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         exit();
     }
     
-    // تحديث الحالة إلى cancelled بدلاً من الحذف الفعلي
     $result = $db->request("appointments?id=eq.{$id}", 'PATCH', ['status' => 'cancelled'], true);
     
     echo json_encode([

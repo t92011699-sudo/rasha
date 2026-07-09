@@ -1,4 +1,4 @@
- <?php
+<?php
 // api/admin-appointments.php
 require_once __DIR__ . '/../config/database.php';
 
@@ -63,4 +63,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         echo json_encode(['status' => 'error', 'message' => 'Failed to delete appointment']);
     }
 }
-?>

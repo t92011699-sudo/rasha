@@ -1,4 +1,4 @@
- <?php
+<?php
 // api/bookings.php
 require_once __DIR__ . '/../config/database.php';
 
@@ -159,4 +159,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     echo json_encode(['status' => 'success', 'message' => 'Booking cancelled successfully']);
     exit();
 }
-?>

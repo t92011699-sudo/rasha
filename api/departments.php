@@ -1,4 +1,4 @@
- <?php
+<?php
 // api/departments.php
 require_once __DIR__ . '/../config/database.php';
 header('Content-Type: application/json');
@@ -126,4 +126,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     ]);
     exit();
 }
-?>

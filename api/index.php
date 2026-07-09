@@ -1313,6 +1313,117 @@ route($routes, 'DELETE', '#^/api/prices/([^/]+)$#', function (array $p) {
         jsonError('حدث خطأ أثناء حذف السعر', 500);
     }
 });
+// ============================
+// 8. Doctor Types Management
+// ============================
+
+// DELETE /api/doctor-types/:id - حذف نوع طبيب
+route($routes, 'DELETE', '#^/api/doctor-types/([^/]+)$#', function (array $p) {
+    requireAuth();
+    
+    $id = $p[1];
+    
+    try {
+        // 1. جلب نوع الطبيب للتأكد من وجوده
+        $doctorType = supabaseGet('doctor_types', [
+            'id' => 'eq.' . $id,
+            'limit' => 1,
+        ], true);
+        
+        if (empty($doctorType)) {
+            jsonError('نوع الطبيب غير موجود', 404);
+        }
+        
+        // 2. حذف جميع المواعيد المرتبطة بنوع الطبيب
+        $slots = supabaseGet('custom_slots', [
+            'doctor_type_id' => 'eq.' . $id,
+        ], true);
+        
+        foreach ($slots as $slot) {
+            supabaseDelete('custom_slots', ['id' => 'eq.' . $slot['id']], true);
+        }
+        
+        // 3. حذف نوع الطبيب
+        supabaseDelete('doctor_types', ['id' => 'eq.' . $id], true);
+        
+        jsonResponse([
+            'success' => true,
+            'message' => 'تم حذف نوع الطبيب وجميع مواعيده بنجاح'
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Error deleting doctor type: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء حذف نوع الطبيب: ' . $e->getMessage(), 500);
+    }
+});
+
+// GET /api/doctor-types/:id - جلب نوع طبيب محدد
+route($routes, 'GET', '#^/api/doctor-types/([^/]+)$#', function (array $p) {
+    $id = $p[1];
+    
+    try {
+        $doctorType = supabaseGet('doctor_types', [
+            'id' => 'eq.' . $id,
+            'limit' => 1,
+        ]);
+        
+        if (empty($doctorType)) {
+            jsonError('نوع الطبيب غير موجود', 404);
+        }
+        
+        // جلب المواعيد المرتبطة
+        $slots = supabaseGet('custom_slots', [
+            'doctor_type_id' => 'eq.' . $id,
+        ]);
+        
+        $doctorType[0]['custom_slots'] = array_map('formatSlotSupabase', $slots);
+        
+        jsonResponse($doctorType[0]);
+    } catch (Exception $e) {
+        error_log('❌ Error fetching doctor type: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء جلب نوع الطبيب', 500);
+    }
+});
+
+// PUT /api/doctor-types/:id - تحديث نوع طبيب
+route($routes, 'PUT', '#^/api/doctor-types/([^/]+)$#', function (array $p) {
+    requireAuth();
+    
+    $id = $p[1];
+    $body = getJsonBody();
+    
+    $updateData = ['updated_at' => nowIso()];
+    
+    if (isset($body['label'])) {
+        $updateData['label'] = $body['label'];
+    }
+    if (isset($body['enabled'])) {
+        $updateData['enabled'] = $body['enabled'] ? 1 : 0;
+    }
+    if (isset($body['type'])) {
+        $updateData['type'] = $body['type'];
+    }
+    
+    try {
+        $existing = supabaseGet('doctor_types', [
+            'id' => 'eq.' . $id,
+            'limit' => 1,
+        ]);
+        
+        if (empty($existing)) {
+            jsonError('نوع الطبيب غير موجود', 404);
+        }
+        
+        supabasePatch('doctor_types', $updateData, ['id' => 'eq.' . $id], true);
+        
+        jsonResponse([
+            'success' => true,
+            'message' => 'تم تحديث نوع الطبيب بنجاح'
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Error updating doctor type: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء تحديث نوع الطبيب', 500);
+    }
+});
 
 // ============================
 // Helper Functions

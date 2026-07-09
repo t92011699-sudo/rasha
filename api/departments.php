@@ -12,11 +12,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $db = new Database();
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
     $department_id = intval($_GET['id']);
-    // استخدم service_role (true) لتجاوز مشاكل RLS
     $deptResult = $db->request("departments?id=eq.{$department_id}&select=*", 'GET', null, true);
     if ($deptResult['status'] !== 200 || empty($deptResult['data'])) {
-        http_response_code(404);
-        echo json_encode(['status' => 'error', 'message' => 'القسم غير موجود']);
+        echo json_encode(['status' => 'error', 'message' => 'Department not found']);
         exit();
     }
     $department = $deptResult['data'][0];

@@ -45,6 +45,11 @@ class Database {
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
+        // Handle empty or null responses to prevent JSON parse errors
+        if (empty($response)) {
+            $response = '[]';
+        }
+        
         return [
             'status' => $http_code,
             'data' => json_decode($response, true)

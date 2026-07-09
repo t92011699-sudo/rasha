@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     
     $result = $db->request("appointments?date=eq.{$date}&select=*", 'GET');
     
-    if ($result['status'] === 200) {
+    if ($result['status'] === 200 && $result['data'] !== null) {
         echo json_encode($result['data']);
     } else {
         echo json_encode([]);
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Check if slot is available
     $checkResult = $db->request("appointments?date=eq.{$data['date']}&time=eq.{$data['time']}&select=id", 'GET');
-    if ($checkResult['status'] === 200 && count($checkResult['data']) > 0) {
+    if ($checkResult['status'] === 200 && $checkResult['data'] !== null && count($checkResult['data']) > 0) {
         echo json_encode(['status' => 'error', 'message' => 'This time slot is already booked']);
         exit();
     }

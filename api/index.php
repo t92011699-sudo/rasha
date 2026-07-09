@@ -277,7 +277,10 @@
             const dateStr = selectedDate.toISOString().split('T')[0];
             
             fetch(`api/appointments.php?date=${dateStr}`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.text().then(text => text ? JSON.parse(text) : []);
+                })
                 .then(data => {
                     bookings = data;
                     displayTimeSlots();
@@ -413,7 +416,10 @@
                     },
                     body: JSON.stringify(bookingData)
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.text().then(text => text ? JSON.parse(text) : {});
+                })
                 .then(data => {
                     if (data.status === 'success') {
                         goToStep(4);

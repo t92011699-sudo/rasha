@@ -18,7 +18,7 @@ $db = new Database();
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $result = $db->request('appointments?select=*&order=date.asc,time.asc', 'GET', null, true);
     
-    if ($result['status'] === 200) {
+    if ($result['status'] === 200 && $result['data'] !== null) {
         echo json_encode($result['data']);
     } else {
         echo json_encode([]);

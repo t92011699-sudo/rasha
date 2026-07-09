@@ -243,7 +243,10 @@ $db = new Database();
         // Load all bookings
         function loadAllBookings() {
             fetch('api/admin-appointments.php')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.text().then(text => text ? JSON.parse(text) : []);
+                })
                 .then(data => {
                     const container = document.getElementById('bookingsList');
                     container.innerHTML = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>#</th><th>المريض</th><th>الهاتف</th><th>العمر</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>';
@@ -293,7 +296,10 @@ $db = new Database();
         // Load departments
         function loadDepartments() {
             fetch('api/departments.php')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.text().then(text => text ? JSON.parse(text) : {});
+                })
                 .then(data => {
                     const container = document.getElementById('departmentsList');
                     container.innerHTML = '<div class="list-group">';

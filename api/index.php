@@ -1,439 +1,465 @@
  <?php
-// index.php - الصفحة الرئيسية للمرضى
-?>
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>عيادة دكتورة راشا - حجز موعد</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            font-family: 'Tahoma', sans-serif;
-        }
-        .booking-container {
-            max-width: 900px;
-            margin: 50px auto;
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            text-align: center;
-        }
-        .step-indicator {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            position: relative;
-        }
-        .step {
-            flex: 1;
-            text-align: center;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            margin: 0 5px;
-            transition: all 0.3s;
-        }
-        .step.active {
-            background: #667eea;
-            color: white;
-        }
-        .step.completed {
-            background: #28a745;
-            color: white;
-        }
-        .time-slot {
-            padding: 10px 20px;
-            margin: 5px;
-            border: 2px solid #dee2e6;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            background: white;
-        }
-        .time-slot:hover {
-            border-color: #667eea;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
-        }
-        .time-slot.selected {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-        .time-slot.booked {
-            background: #e9ecef;
-            color: #6c757d;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 5px;
-            direction: rtl;
-        }
-        .calendar-day {
-            padding: 10px;
-            text-align: center;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .calendar-day:hover {
-            background: #667eea;
-            color: white;
-        }
-        .calendar-day.selected {
-            background: #667eea;
-            color: white;
-        }
-        .calendar-day.disabled {
-            color: #ccc;
-            cursor: not-allowed;
-        }
-        .form-section {
-            display: none;
-        }
-        .form-section.active {
-            display: block;
-        }
-        .btn-primary-custom {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            color: white;
-            padding: 12px 30px;
-            border-radius: 50px;
-            font-weight: bold;
-            transition: all 0.3s;
-        }
-        .btn-primary-custom:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-            color: white;
-        }
-    </style>
-</head>
-<body>
-    <div class="booking-container">
-        <div class="header">
-            <h1><i class="fas fa-stethoscope"></i> عيادة دكتورة راشا</h1>
-            <p class="mb-0">احجز موعدك الآن بكل سهولة</p>
-        </div>
+/**
+ * Clinic API - PHP version with Supabase
+ * Version: 3.0.2
+ */
 
-        <!-- Step Indicator -->
-        <div class="step-indicator">
-            <div class="step active" id="step1">1. اختيار التاريخ</div>
-            <div class="step" id="step2">2. اختيار الوقت</div>
-            <div class="step" id="step3">3. إدخال البيانات</div>
-            <div class="step" id="step4">4. تأكيد الحجز</div>
-        </div>
+declare(strict_types=1);
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
 
-        <!-- Step 1: Calendar -->
-        <div class="form-section active" id="section1">
-            <h4><i class="fas fa-calendar-alt"></i> اختر تاريخ الموعد</h4>
-            <div id="calendar" class="calendar-grid mt-3"></div>
-            <div class="text-center mt-3">
-                <button class="btn btn-primary-custom" id="selectDateBtn" disabled>اختر الوقت <i class="fas fa-arrow-left"></i></button>
-            </div>
-        </div>
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/http.php';
+require_once __DIR__ . '/../helpers/jwt.php';
+require_once __DIR__ . '/../helpers/slots.php';
 
-        <!-- Step 2: Time Slots -->
-        <div class="form-section" id="section2">
-            <h4><i class="fas fa-clock"></i> اختر الوقت المناسب</h4>
-            <div id="timeSlots" class="mt-3"></div>
-            <div class="text-center mt-3">
-                <button class="btn btn-secondary me-2" onclick="goToStep(1)"><i class="fas fa-arrow-right"></i> السابق</button>
-                <button class="btn btn-primary-custom" id="selectTimeBtn" disabled>أدخل البيانات <i class="fas fa-arrow-left"></i></button>
-            </div>
-        </div>
+// ===== CORS =====
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
 
-        <!-- Step 3: Patient Form -->
-        <div class="form-section" id="section3">
-            <h4><i class="fas fa-user"></i> أدخل بياناتك</h4>
-            <form id="patientForm">
-                <div class="mb-3">
-                    <label class="form-label">الاسم الكامل</label>
-                    <input type="text" class="form-control" id="patientName" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">رقم الهاتف</label>
-                    <input type="tel" class="form-control" id="patientPhone" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">العمر</label>
-                    <input type="number" class="form-control" id="patientAge" required>
-                </div>
-                <div class="text-center">
-                    <button type="button" class="btn btn-secondary me-2" onclick="goToStep(2)"><i class="fas fa-arrow-right"></i> السابق</button>
-                    <button type="submit" class="btn btn-primary-custom">تأكيد الحجز <i class="fas fa-check"></i></button>
-                </div>
-            </form>
-        </div>
+$method = $_SERVER['REQUEST_METHOD'];
+$uri = rtrim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+if ($uri === '') {
+    $uri = '/';
+}
 
-        <!-- Step 4: Confirmation -->
-        <div class="form-section" id="section4">
-            <div class="text-center">
-                <i class="fas fa-check-circle" style="font-size: 80px; color: #28a745;"></i>
-                <h3 class="mt-3">تم حجز الموعد بنجاح!</h3>
-                <p>شكراً لك، سيتم تأكيد حجزك عبر رسالة نصية.</p>
-                <button class="btn btn-primary-custom mt-3" onclick="resetBooking()">حجز موعد آخر</button>
-            </div>
-        </div>
-    </div>
+// ===== Simple router =====
+$routes = [];
 
-    <script>
-        let selectedDate = null;
-        let selectedTime = null;
-        let bookings = [];
-        let currentStep = 1;
+function route(array &$routes, string $method, string $pattern, callable $handler): void
+{
+    $routes[] = [$method, $pattern, $handler];
+}
 
-        // Generate calendar for current month
-        function generateCalendar() {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = today.getMonth();
-            
-            const firstDay = new Date(year, month, 1);
-            const lastDay = new Date(year, month + 1, 0);
-            const daysInMonth = lastDay.getDate();
-            
-            const calendar = document.getElementById('calendar');
-            calendar.innerHTML = '';
-            
-            // Day names
-            const dayNames = ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'];
-            dayNames.forEach(name => {
-                const dayNameDiv = document.createElement('div');
-                dayNameDiv.className = 'calendar-day font-weight-bold';
-                dayNameDiv.textContent = name;
-                calendar.appendChild(dayNameDiv);
-            });
-            
-            // Empty days before first day
-            for (let i = 0; i < firstDay.getDay(); i++) {
-                const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'calendar-day disabled';
-                calendar.appendChild(emptyDiv);
-            }
-            
-            // Days
-            for (let day = 1; day <= daysInMonth; day++) {
-                const dayDiv = document.createElement('div');
-                dayDiv.className = 'calendar-day';
-                dayDiv.textContent = day;
-                
-                const date = new Date(year, month, day);
-                const todayDate = new Date();
-                todayDate.setHours(0, 0, 0, 0);
-                
-                // Disable past days and Fridays (جمعة)
-                if (date < todayDate || date.getDay() === 5) {
-                    dayDiv.className += ' disabled';
-                } else {
-                    dayDiv.onclick = function() {
-                        selectDate(year, month, day);
-                    };
-                }
-                
-                calendar.appendChild(dayDiv);
+function dispatch(array $routes, string $method, string $uri): void
+{
+    foreach ($routes as [$routeMethod, $pattern, $handler]) {
+        if ($routeMethod !== $method) {
+            continue;
+        }
+        if (preg_match($pattern, $uri, $matches)) {
+            $handler($matches);
+            return;
+        }
+    }
+    jsonError('المسار غير موجود', 404);
+}
+
+// ============================
+// 1. Health Check
+// ============================
+
+route($routes, 'GET', '#^/$#', function () {
+    jsonResponse([
+        'message' => '🚀 Clinic API is running! (Supabase)',
+        'supabase_connected' => isDbConfigured(),
+        'version' => '3.0.2',
+    ]);
+});
+
+route($routes, 'GET', '#^/api/health$#', function () {
+    jsonResponse([
+        'status' => 'OK',
+        'timestamp' => nowIso(),
+        'supabase' => isDbConfigured() ? 'Connected ✅' : 'Missing ❌',
+    ]);
+});
+
+// ============================
+// 2. Admin Login
+// ============================
+
+route($routes, 'POST', '#^/api/admin/login$#', function () {
+    $body = getJsonBody();
+    $email = $body['email'] ?? null;
+    $password = $body['password'] ?? null;
+
+    if (!$email || !$password) {
+        jsonError('البريد الإلكتروني وكلمة المرور مطلوبان', 400);
+    }
+
+    $result = supabaseRequest("admins?email=eq.$email&select=*");
+    if ($result['status'] !== 200 || empty($result['data'])) {
+        jsonError('بيانات الدخول غير صحيحة', 401);
+    }
+
+    $admin = $result['data'][0];
+
+    // Simple password check (in production, use password_hash)
+    if ($admin['password'] !== $password) {
+        jsonError('بيانات الدخول غير صحيحة', 401);
+    }
+
+    $role = $admin['role'] ?? 'admin';
+    $token = jwtSign([
+        'id' => $admin['id'],
+        'email' => $admin['email'],
+        'role' => $role,
+    ], JWT_SECRET);
+
+    $accountKey = $role === 'admin' ? 'admin' : 'user';
+
+    jsonResponse([
+        'success' => true,
+        'message' => 'تم تسجيل الدخول بنجاح',
+        'token' => $token,
+        $accountKey => [
+            'id' => $admin['id'],
+            'email' => $admin['email'],
+            'role' => $role,
+        ],
+    ]);
+});
+
+// ============================
+// 3. Departments - GET all
+// ============================
+
+route($routes, 'GET', '#^/api/departments$#', function () {
+    $deptResult = supabaseRequest('departments?select=*&order=order.asc');
+    if ($deptResult['status'] !== 200 || empty($deptResult['data'])) {
+        jsonResponse([]);
+        return;
+    }
+    $departments = $deptResult['data'];
+
+    $typesResult = supabaseRequest('doctor_types?select=*&enabled=eq.true');
+    $doctorTypes = ($typesResult['status'] === 200 && is_array($typesResult['data'])) ? $typesResult['data'] : [];
+
+    $result = [];
+    foreach ($departments as $dept) {
+        $types = array_values(array_filter($doctorTypes, fn($dt) => $dt['department_id'] === $dept['id']));
+        $formattedTypes = [];
+        foreach ($types as $dt) {
+            $dt['enabled'] = (bool) $dt['enabled'];
+            $slots = fetchCustomSlots($dt['id']);
+            $dt['custom_slots'] = array_map(fn($slot) => formatSlot($slot), $slots);
+            $formattedTypes[] = $dt;
+        }
+        $dept['doctor_types'] = $formattedTypes;
+        $result[] = $dept;
+    }
+
+    jsonResponse($result);
+});
+
+// ============================
+// 4. Departments - GET by ID
+// ============================
+
+route($routes, 'GET', '#^/api/departments/([^/]+)$#', function (array $p) {
+    $id = $p[1];
+
+    $deptResult = supabaseRequest("departments?id=eq.$id&select=*");
+    if ($deptResult['status'] !== 200 || empty($deptResult['data'])) {
+        jsonError('القسم غير موجود', 404);
+    }
+    $department = $deptResult['data'][0];
+
+    $typesResult = supabaseRequest("doctor_types?department_id=eq.$id&select=*&order=type.asc");
+    $doctorTypes = ($typesResult['status'] === 200 && is_array($typesResult['data'])) ? $typesResult['data'] : [];
+
+    $formattedTypes = [];
+    foreach ($doctorTypes as $dt) {
+        $dt['enabled'] = (bool) $dt['enabled'];
+        $slots = fetchCustomSlots($dt['id']);
+        $dt['custom_slots'] = array_map(fn($slot) => formatSlot($slot), $slots);
+        $formattedTypes[] = $dt;
+    }
+
+    $department['doctor_types'] = $formattedTypes;
+    jsonResponse($department);
+});
+
+// ============================
+// 5. Departments - POST (Create)
+// ============================
+
+route($routes, 'POST', '#^/api/departments$#', function () {
+    $body = getJsonBody();
+    $name = $body['name'] ?? null;
+    $iconUrl = $body['icon_url'] ?? null;
+    $doctorTypes = $body['doctor_types'] ?? null;
+
+    if (!$name) {
+        jsonError('اسم القسم مطلوب', 400);
+    }
+
+    // Get max order
+    $orderResult = supabaseRequest('departments?select=order&order=order.desc&limit=1');
+    $nextOrder = 1;
+    if ($orderResult['status'] === 200 && !empty($orderResult['data'])) {
+        $nextOrder = intval($orderResult['data'][0]['order']) + 1;
+    }
+
+    $insertData = [
+        'name' => $name,
+        'icon_url' => $iconUrl,
+        'order' => $nextOrder
+    ];
+
+    $result = supabaseRequest('departments', 'POST', $insertData);
+    if ($result['status'] !== 201) {
+        jsonError('فشل في إضافة القسم: ' . json_encode($result), 500);
+    }
+
+    $department = $result['data'][0];
+    $addedTypes = [];
+
+    if (is_array($doctorTypes) && count($doctorTypes) > 0) {
+        foreach ($doctorTypes as $type) {
+            $label = $type['label'] ?? (($type['type'] ?? '') === 'male' ? 'دكتور' : 'دكتورة');
+            $enabled = $type['enabled'] ?? true;
+
+            $typeData = [
+                'department_id' => $department['id'],
+                'type' => $type['type'] ?? 'male',
+                'label' => $label,
+                'enabled' => $enabled
+            ];
+
+            $typeResult = supabaseRequest('doctor_types', 'POST', $typeData);
+            if ($typeResult['status'] === 201) {
+                $newType = $typeResult['data'][0];
+                $newType['enabled'] = (bool) $newType['enabled'];
+                $newType['custom_slots'] = [];
+                $addedTypes[] = $newType;
             }
         }
+    }
 
-        function selectDate(year, month, day) {
-            // Remove previous selection
-            document.querySelectorAll('.calendar-day.selected').forEach(el => {
-                el.classList.remove('selected');
-            });
-            
-            // Add selection
-            const days = document.querySelectorAll('.calendar-day');
-            const targetDate = new Date(year, month, day);
-            days.forEach(dayEl => {
-                if (parseInt(dayEl.textContent) === day && !dayEl.classList.contains('disabled')) {
-                    dayEl.classList.add('selected');
-                }
-            });
-            
-            selectedDate = targetDate;
-            document.getElementById('selectDateBtn').disabled = false;
-        }
+    $department['doctor_types'] = $addedTypes;
+    jsonResponse($department, 201);
+});
 
-        // Load time slots for selected date
-        function loadTimeSlots() {
-            if (!selectedDate) return;
-            
-            const dateStr = selectedDate.toISOString().split('T')[0];
-            
-            fetch(`api/appointments.php?date=${dateStr}`)
-                .then(response => {
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    return response.text().then(text => text ? JSON.parse(text) : []);
-                })
-                .then(data => {
-                    bookings = data;
-                    displayTimeSlots();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    displayTimeSlots(); // Show all slots if error
-                });
-        }
+// ============================
+// 6. Departments - PUT Update
+// ============================
 
-        function displayTimeSlots() {
-            const container = document.getElementById('timeSlots');
-            container.innerHTML = '';
-            
-            // Generate time slots from 9 AM to 9 PM
-            const slots = [];
-            for (let hour = 9; hour <= 20; hour++) {
-                slots.push(`${hour.toString().padStart(2, '0')}:00`);
-                slots.push(`${hour.toString().padStart(2, '0')}:30`);
-            }
-            
-            // Remove last slot at 20:30 if needed
-            if (slots[slots.length - 1] === '20:30') slots.pop();
-            
-            slots.forEach(time => {
-                const slotDiv = document.createElement('div');
-                slotDiv.className = 'time-slot';
-                slotDiv.textContent = time;
-                
-                // Check if slot is booked
-                const isBooked = bookings.some(booking => booking.time === time && booking.date === selectedDate.toISOString().split('T')[0]);
-                
-                if (isBooked) {
-                    slotDiv.classList.add('booked');
-                } else {
-                    slotDiv.onclick = function() {
-                        selectTime(time);
-                    };
-                }
-                
-                container.appendChild(slotDiv);
-            });
-        }
+route($routes, 'PUT', '#^/api/departments/([^/]+)$#', function (array $p) {
+    $id = $p[1];
+    $body = getJsonBody();
 
-        function selectTime(time) {
-            document.querySelectorAll('.time-slot.selected').forEach(el => {
-                el.classList.remove('selected');
-            });
-            
-            document.querySelectorAll('.time-slot').forEach(el => {
-                if (el.textContent === time && !el.classList.contains('booked')) {
-                    el.classList.add('selected');
-                }
-            });
-            
-            selectedTime = time;
-            document.getElementById('selectTimeBtn').disabled = false;
-        }
+    $updateData = [];
+    if (!empty($body['name'])) {
+        $updateData['name'] = $body['name'];
+    }
+    if (array_key_exists('icon_url', $body)) {
+        $updateData['icon_url'] = $body['icon_url'];
+    }
 
-        // Navigation
-        function goToStep(step) {
-            currentStep = step;
-            
-            // Hide all sections
-            document.querySelectorAll('.form-section').forEach(el => {
-                el.classList.remove('active');
-            });
-            
-            // Show selected section
-            document.getElementById(`section${step}`).classList.add('active');
-            
-            // Update step indicators
-            document.querySelectorAll('.step').forEach((el, index) => {
-                const stepNum = index + 1;
-                el.classList.remove('active', 'completed');
-                if (stepNum === step) {
-                    el.classList.add('active');
-                } else if (stepNum < step) {
-                    el.classList.add('completed');
-                }
-            });
-        }
+    if (empty($updateData)) {
+        jsonError('لا توجد بيانات للتحديث', 400);
+    }
 
-        // Reset booking
-        function resetBooking() {
-            selectedDate = null;
-            selectedTime = null;
-            document.getElementById('selectDateBtn').disabled = true;
-            document.getElementById('selectTimeBtn').disabled = true;
-            document.getElementById('patientForm').reset();
-            goToStep(1);
-            generateCalendar();
-        }
+    $result = supabaseRequest("departments?id=eq.$id", 'PATCH', $updateData);
+    if ($result['status'] !== 200) {
+        jsonError('فشل في تحديث القسم', 500);
+    }
 
-        // Event listeners
-        document.addEventListener('DOMContentLoaded', function() {
-            generateCalendar();
-            
-            document.getElementById('selectDateBtn').addEventListener('click', function() {
-                loadTimeSlots();
-                goToStep(2);
-            });
-            
-            document.getElementById('selectTimeBtn').addEventListener('click', function() {
-                goToStep(3);
-            });
-            
-            document.getElementById('patientForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const name = document.getElementById('patientName').value;
-                const phone = document.getElementById('patientPhone').value;
-                const age = document.getElementById('patientAge').value;
-                
-                if (!name || !phone || !age) {
-                    alert('الرجاء ملء جميع الحقول');
-                    return;
-                }
-                
-                const bookingData = {
-                    name: name,
-                    phone: phone,
-                    age: age,
-                    date: selectedDate.toISOString().split('T')[0],
-                    time: selectedTime,
-                    status: 'pending'
-                };
-                
-                fetch('api/appointments.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(bookingData)
-                })
-                .then(response => {
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    return response.text().then(text => text ? JSON.parse(text) : {});
-                })
-                .then(data => {
-                    if (data.status === 'success') {
-                        goToStep(4);
-                    } else {
-                        alert('حدث خطأ في الحجز، يرجى المحاولة مرة أخرى');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('حدث خطأ في الحجز، يرجى المحاولة مرة أخرى');
-                });
-            });
-        });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    $department = fetchRowById('departments', $id);
+    if (!$department) {
+        jsonError('القسم غير موجود', 404);
+    }
+
+    jsonResponse($department);
+});
+
+// ============================
+// 7. Departments - DELETE
+// ============================
+
+route($routes, 'DELETE', '#^/api/departments/([^/]+)$#', function (array $p) {
+    $id = $p[1];
+
+    $result = supabaseRequest("departments?id=eq.$id", 'DELETE');
+    if ($result['status'] === 204 || $result['status'] === 200) {
+        jsonResponse(['message' => 'تم حذف القسم بنجاح']);
+    } else {
+        jsonError('فشل في حذف القسم', 500);
+    }
+});
+
+// ============================
+// 8. Bookings - POST
+// ============================
+
+route($routes, 'POST', '#^/api/bookings$#', function () {
+    $body = getJsonBody();
+
+    $departmentId = $body['department_id'] ?? null;
+    $doctorType = $body['doctor_type'] ?? null;
+    $slotId = $body['slot_id'] ?? null;
+    $bookingDate = $body['booking_date'] ?? null;
+    $bookingTime = $body['booking_time'] ?? null;
+    $patientName = $body['patient_name'] ?? null;
+    $patientAge = $body['patient_age'] ?? null;
+    $patientPhone = $body['patient_phone'] ?? null;
+    $patientGender = $body['patient_gender'] ?? null;
+
+    if (!$departmentId || !$doctorType || !$slotId || !$bookingDate || !$patientName || !$patientAge || !$patientPhone || !$patientGender) {
+        jsonError('جميع الحقول مطلوبة', 400);
+    }
+
+    // Check phone number
+    $phoneResult = supabaseRequest("bookings?patient_phone=eq.$patientPhone&select=id,patient_name");
+    if ($phoneResult['status'] === 200 && !empty($phoneResult['data'])) {
+        jsonResponse([
+            'error' => 'رقم التليفون مستخدم بالفعل في حجز آخر',
+            'existing_booking' => $phoneResult['data'][0]
+        ], 400);
+    }
+
+    // Get doctor type
+    $typeResult = supabaseRequest("doctor_types?department_id=eq.$departmentId&type=eq.$doctorType&select=id");
+    if ($typeResult['status'] !== 200 || empty($typeResult['data'])) {
+        jsonError('نوع الطبيب غير موجود', 404);
+    }
+    $doctorTypeId = $typeResult['data'][0]['id'];
+
+    // Get slot
+    $slotResult = supabaseRequest("custom_slots?id=eq.$slotId&doctor_type_id=eq.$doctorTypeId&date=eq.$bookingDate&select=id,capacity,from_time,to_time");
+    if ($slotResult['status'] !== 200 || empty($slotResult['data'])) {
+        jsonError('الموعد غير موجود', 404);
+    }
+    $customSlot = $slotResult['data'][0];
+
+    // Check capacity
+    $currentCount = countBookingsForSlot($slotId);
+    if ($currentCount >= $customSlot['capacity']) {
+        jsonResponse([
+            'error' => 'الموعد مكتمل، لا توجد أماكن متاحة',
+            'capacity' => $customSlot['capacity'],
+            'current_bookings' => $currentCount,
+            'remaining' => 0,
+        ], 400);
+    }
+
+    $finalBookingTime = $bookingTime ?: (timeShort($customSlot['from_time']) . ' - ' . timeShort($customSlot['to_time']));
+
+    $bookingData = [
+        'department_id' => $departmentId,
+        'doctor_type_id' => $doctorTypeId,
+        'custom_slot_id' => $slotId,
+        'booking_date' => $bookingDate,
+        'booking_time' => $finalBookingTime,
+        'patient_name' => $patientName,
+        'patient_age' => $patientAge,
+        'patient_phone' => $patientPhone,
+        'patient_gender' => $patientGender
+    ];
+
+    $result = supabaseRequest('bookings', 'POST', $bookingData);
+    if ($result['status'] !== 201) {
+        jsonError('فشل في إنشاء الحجز', 500);
+    }
+
+    $booking = $result['data'][0];
+    $newCount = countBookingsForSlot($slotId);
+
+    jsonResponse([
+        'success' => true,
+        'booking' => $booking,
+        'capacity' => $customSlot['capacity'],
+        'current_bookings' => $newCount,
+        'remaining' => $customSlot['capacity'] - $newCount,
+    ], 201);
+});
+
+// ============================
+// 9. Bookings - GET All (Admin)
+// ============================
+
+route($routes, 'GET', '#^/api/admin/bookings$#', function () {
+    $bookings = fetchBookingsWithRelations();
+
+    $formatted = array_map(function ($row) {
+        $slotFrom = timeShort($row['custom_slot']['from_time'] ?? null);
+        $slotTo = timeShort($row['custom_slot']['to_time'] ?? null);
+        $capacity = (int) ($row['custom_slot']['capacity'] ?? 0);
+        $currentBookings = countBookingsForSlot($row['custom_slot_id']);
+
+        return [
+            'patient' => [
+                'id' => $row['id'],
+                'name' => $row['patient_name'],
+                'age' => $row['patient_age'],
+                'phone' => $row['patient_phone'],
+                'gender' => $row['patient_gender'] === 'male' ? 'ذكر' : 'أنثى',
+            ],
+            'booking' => [
+                'id' => $row['id'],
+                'date' => $row['booking_date'],
+                'booking_time' => $row['booking_time'],
+                'slot_range' => ($slotFrom && $slotTo) ? "$slotFrom - $slotTo" : null,
+                'slot_from' => $slotFrom,
+                'slot_to' => $slotTo,
+                'capacity' => $capacity,
+                'current_bookings' => $currentBookings,
+                'remaining' => $capacity - $currentBookings,
+                'is_full' => $currentBookings >= $capacity,
+            ],
+            'department' => [
+                'id' => $row['department']['id'] ?? null,
+                'name' => $row['department']['name'] ?? 'غير معروف',
+                'icon' => $row['department']['icon_url'] ?? null,
+            ],
+            'doctor' => [
+                'id' => $row['doctor_type']['id'] ?? null,
+                'type' => $row['doctor_type']['type'] ?? null,
+                'label' => $row['doctor_type']['label'] ?? 'غير معروف',
+            ],
+            'created_at' => $row['created_at'],
+        ];
+    }, $bookings);
+
+    jsonResponse($formatted);
+});
+
+// ============================
+// 10. Bookings - DELETE
+// ============================
+
+route($routes, 'DELETE', '#^/api/bookings/([^/]+)$#', function (array $p) {
+    $id = $p[1];
+
+    // Get the booking first to know the slot
+    $bookingResult = supabaseRequest("bookings?id=eq.$id&select=custom_slot_id");
+    if ($bookingResult['status'] !== 200 || empty($bookingResult['data'])) {
+        jsonError('الحجز غير موجود', 404);
+    }
+    $booking = $bookingResult['data'][0];
+
+    $result = supabaseRequest("bookings?id=eq.$id", 'DELETE');
+    if ($result['status'] !== 204 && $result['status'] !== 200) {
+        jsonError('فشل في إلغاء الحجز', 500);
+    }
+
+    $newCount = countBookingsForSlot($booking['custom_slot_id']);
+    $slotResult = supabaseRequest("custom_slots?id=eq.{$booking['custom_slot_id']}&select=capacity");
+    $capacity = ($slotResult['status'] === 200 && !empty($slotResult['data'])) ? $slotResult['data'][0]['capacity'] : 0;
+
+    jsonResponse([
+        'message' => 'تم إلغاء الحجز بنجاح',
+        'slot_id' => $booking['custom_slot_id'],
+        'capacity' => $capacity,
+        'current_bookings' => $newCount,
+        'remaining' => $capacity - $newCount,
+    ]);
+});
+
+// ============================
+// Run the router
+// ============================
+
+try {
+    dispatch($routes, $method, $uri);
+} catch (Throwable $e) {
+    error_log('❌ Unhandled error: ' . $e->getMessage());
+    jsonError('Server error: ' . $e->getMessage(), 500);
+}

@@ -4,7 +4,7 @@
  * Version: 3.2.0
  */
 
-$root = $_SERVER['DOCUMENT_ROOT'];
+$root = dirname(__DIR__);
 
 require_once $root . '/config/database.php';
 require_once $root . '/helpers/http.php';
@@ -72,10 +72,9 @@ function requireAuth(): array {
 
 route($routes, 'GET', '#^/$#', function () {
     jsonResponse([
-        'message' => '🚀 Clinic API is running on Hostinger!',
+        'message' => '🚀 Clinic API is running!',
         'database' => isDbConfigured() ? 'Connected ✅' : 'Missing ❌',
         'version' => '3.2.0',
-        'server' => 'Hostinger',
     ]);
 });
 
@@ -84,7 +83,6 @@ route($routes, 'GET', '#^/api/health$#', function () {
         'status' => 'OK',
         'timestamp' => nowIso(),
         'database' => isDbConfigured() ? 'Connected ✅' : 'Missing ❌',
-        'environment' => 'Hostinger',
     ]);
 });
 
@@ -419,17 +417,13 @@ route($routes, 'GET', '#^/api/bookings/all$#', function () {
     try {
         $bookings = dbGet('bookings', [], '*');
         
-        // جلب تفاصيل إضافية لكل حجز
         foreach ($bookings as &$booking) {
-            // جلب اسم القسم
             $department = dbGet('departments', ['id' => $booking['department_id']]);
             $booking['department_name'] = $department[0]['name'] ?? 'غير معروف';
             
-            // جلب اسم الدكتور
             $doctorType = dbGet('doctor_types', ['id' => $booking['doctor_type_id']]);
             $booking['doctor_label'] = $doctorType[0]['label'] ?? 'غير معروف';
             
-            // جلب تفاصيل الموعد
             $slot = dbGet('custom_slots', ['id' => $booking['custom_slot_id']]);
             if (!empty($slot)) {
                 $booking['slot_from'] = $slot[0]['from_time'] ?? null;
@@ -465,7 +459,6 @@ route($routes, 'GET', '#^/api/admin/bookings$#', function () {
     try {
         $bookings = dbGet('bookings', [], '*');
         
-        // جلب تفاصيل إضافية لكل حجز
         foreach ($bookings as &$booking) {
             $department = dbGet('departments', ['id' => $booking['department_id']]);
             $booking['department_name'] = $department[0]['name'] ?? 'غير معروف';
@@ -500,13 +493,11 @@ route($routes, 'POST', '#^/api/bookings$#', function () {
     }
     
     try {
-        // التحقق من أن الموعد متاح
         $slot = dbGet('custom_slots', ['id' => $body['slot_id']]);
         if (empty($slot)) {
             jsonError('الموعد غير موجود', 404);
         }
         
-        // حساب عدد الحجوزات الحالية لهذا الموعد
         $currentBookings = dbGet('bookings', ['custom_slot_id' => $body['slot_id']]);
         $currentCount = count($currentBookings);
         
@@ -514,7 +505,6 @@ route($routes, 'POST', '#^/api/bookings$#', function () {
             jsonError('الموعد مكتمل، لا توجد أماكن متاحة', 400);
         }
         
-        // إنشاء الحجز
         $result = dbInsert('bookings', [
             'department_id' => $body['department_id'],
             'doctor_type_id' => $body['doctor_type'],
@@ -545,7 +535,6 @@ route($routes, 'DELETE', '#^/api/bookings/([^/]+)$#', function (array $p) {
     $id = $p[1];
     
     try {
-        // التحقق من وجود الحجز
         $booking = dbGet('bookings', ['id' => $id]);
         if (empty($booking)) {
             jsonError('الحجز غير موجود', 404);

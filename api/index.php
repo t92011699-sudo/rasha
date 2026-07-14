@@ -180,6 +180,34 @@ route($routes, 'POST', '#^/api/admin/change-password$#', function () {
     }
 });
 
+route($routes, 'GET', '#^/api/admin/profile$#', function () {
+    $payload = requireAuth();
+    $adminId = $payload['id'];
+
+    try {
+        $conn = getDbConnection();
+        $stmt = $conn->prepare("SELECT id, email, role, created_at FROM admins WHERE id = ?");
+        $stmt->bind_param("i", $adminId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $admin = $result->fetch_assoc();
+        $stmt->close();
+        $conn->close();
+
+        if (!$admin) {
+            jsonError('المسؤول غير موجود', 404);
+        }
+
+        jsonResponse([
+            'success' => true,
+            'user' => $admin
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Get profile error: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء جلب بيانات الحساب', 500);
+    }
+});
+
 // ============================
 // 2. Departments
 // ============================

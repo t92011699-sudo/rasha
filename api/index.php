@@ -138,6 +138,48 @@ route($routes, 'POST', '#^/api/admin/login$#', function () {
     }
 });
 
+route($routes, 'POST', '#^/api/admin/change-password$#', function () {
+    $payload = requireAuth();
+    $adminId = $payload['id'];
+    
+    $body = getJsonBody();
+    $currentPassword = $body['current_password'] ?? null;
+    $newPassword = $body['new_password'] ?? null;
+
+    if (!$currentPassword || !$newPassword) {
+        jsonError('كلمة المرور الحالية والجديدة مطلوبتان', 400);
+    }
+
+    try {
+        $conn = getDbConnection();
+        $stmt = $conn->prepare("SELECT password FROM admins WHERE id = ?");
+        $stmt->bind_param("i", $adminId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $admin = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$admin || $currentPassword !== $admin['password']) {
+            $conn->close();
+            jsonError('كلمة المرور الحالية غير صحيحة', 401);
+        }
+
+        $stmt = $conn->prepare("UPDATE admins SET password = ? WHERE id = ?");
+        $stmt->bind_param("si", $newPassword, $adminId);
+        $stmt->execute();
+        $stmt->close();
+        $conn->close();
+
+        jsonResponse([
+            'success' => true,
+            'message' => 'تم تغيير كلمة المرور بنجاح'
+        ]);
+    } catch (Exception $e) {
+        error_log('❌ Change password error: ' . $e->getMessage());
+        jsonError('حدث خطأ أثناء تغيير كلمة المرور', 500);
+    }
+});
+
 // ============================
 // 2. Departments
 // ============================

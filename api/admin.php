@@ -147,6 +147,7 @@ $db = new Database();
                 <a href="#" data-tab="bookings"><i class="fas fa-list"></i> الحجوزات</a>
                 <a href="#" data-tab="departments"><i class="fas fa-building"></i> الأقسام</a>
                 <a href="#" data-tab="prices"><i class="fas fa-dollar-sign"></i> الأسعار</a>
+                <a href="#" data-tab="settings"><i class="fas fa-cog"></i> الإعدادات</a>
                 <a href="?logout=1" class="text-danger"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</a>
             </div>
             
@@ -238,6 +239,35 @@ $db = new Database();
                     </div>
                     
                     <div id="pricesList"></div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div id="settings" class="tab-content">
+                    <h3 class="mb-4"><i class="fas fa-cog"></i> الإعدادات</h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="stats-card">
+                                <h5>تغيير كلمة المرور</h5>
+                                <hr>
+                                <form id="changePasswordForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">كلمة المرور الحالية</label>
+                                        <input type="password" id="currentPassword" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">كلمة المرور الجديدة</label>
+                                        <input type="password" id="newPassword" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">تأكيد كلمة المرور الجديدة</label>
+                                        <input type="password" id="confirmPassword" class="form-control" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">تحديث كلمة المرور</button>
+                                </form>
+                                <div id="passwordMessage" class="mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -709,6 +739,48 @@ $db = new Database();
                     console.error('Error moving price:', error);
                 });
         }
+
+        // Change Password Form Handling
+        document.getElementById('changePasswordForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const messageDiv = document.getElementById('passwordMessage');
+            
+            if (newPassword !== confirmPassword) {
+                messageDiv.innerHTML = '<div class="alert alert-danger">كلمات المرور الجديدة غير متطابقة</div>';
+                return;
+            }
+            
+            // Get token from session (assuming it's stored or we can login again to get it)
+            // For now, we'll try to use the API directly if possible, or simulate the token
+            // Since this is a server-side session, we might need a different approach if the API requires JWT
+            // But the current admin.php uses session. Let's add a specialized endpoint for session-based change.
+            
+            fetch('api/admin-change-password.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    current_password: currentPassword,
+                    new_password: newPassword
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    messageDiv.innerHTML = '<div class="alert alert-success">' + result.message + '</div>';
+                    document.getElementById('changePasswordForm').reset();
+                } else {
+                    messageDiv.innerHTML = '<div class="alert alert-danger">' + result.message + '</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error changing password:', error);
+                messageDiv.innerHTML = '<div class="alert alert-danger">حدث خطأ في الاتصال بالخادم</div>';
+            });
+        });
 
         // تحميل الأسعار عند فتح الصفحة
         document.addEventListener('DOMContentLoaded', function() {
